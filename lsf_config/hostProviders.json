@@ -1,0 +1,11 @@
+{
+  "providers": [
+    {
+      "name": "google",
+      "type": "googleProv",
+      "confPath": "resource_connector/google/conf",
+      "scriptPath": "resource_connector/google",
+      "provHostTimeOut": 120
+    }
+  ]
+}

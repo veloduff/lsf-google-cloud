@@ -1,0 +1,21 @@
+# =====================================================================
+# Yosys Synthesis Script - synthesis.ys
+# =====================================================================
+
+# 1. Read Verilog design
+read_verilog counter.v
+
+# 2. Check design hierarchy and set top module
+hierarchy -check -top counter
+
+# 3. Translate process, finite state machines, and optimize
+synth -top counter
+
+# 4. Map to internal technology gate cells
+abc -g gates
+
+# 5. Display design statistics
+stat
+
+# 6. Write the synthesized gate-level netlist
+write_verilog counter_synth.v

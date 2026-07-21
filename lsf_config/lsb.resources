@@ -1,0 +1,12 @@
+# =====================================================================
+# LSF Resource Allocation Limits - lsb.resources
+# =====================================================================
+
+# Safety limit to prevent runaway cloud provisioning costs.
+Begin Limit
+  NAME        = cloud_slot_limit
+  # Apply this limit to all hosts except the static master host
+  HOSTS       = all ~master
+  # Cap the total concurrent slots (physical cores) in GCP to 1000 to control costs
+  SLOTS       = 1000
+End Limit

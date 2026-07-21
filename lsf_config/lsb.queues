@@ -1,0 +1,24 @@
+# =====================================================================
+# LSF Batch Queues - lsb.queues
+# =====================================================================
+
+Begin Queue
+QUEUE_NAME   = normal
+PRIORITY     = 20
+USERS        = all
+HOSTS        = master
+DESCRIPTION  = Standard queue for local on-premises workloads.
+End Queue
+
+Begin Queue
+QUEUE_NAME   = eda
+PRIORITY     = 30
+USERS        = all
+# Allow running on both local master (for testing) and dynamic GCP hosts
+HOSTS        = master allremote
+# Enable cloud bursting via the GCP provider
+RC_HOSTS     = googlehost
+# Trigger cloud bursting if 1 job pends for 1 minute
+RC_DEMAND_POLICY = THRESHOLD[[1, 1]]
+DESCRIPTION  = High-throughput queue for EDA workloads bursting to GCP.
+End Queue

@@ -1,0 +1,12 @@
+# =====================================================================
+# LSF Batch Hosts - lsb.hosts
+# =====================================================================
+
+Begin Host
+HOST_NAME    MXJ    r1m    pg    ls    tmp    DISPATCH_WINDOW
+# Static Master Host is limited to 4 slots
+master       4      -      -     -     -      -
+# Default rule for dynamically joined cloud hosts (MXJ = ! means auto-detect CPU count)
+default      !      -      -     -     -      -
+End Host
+

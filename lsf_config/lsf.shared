@@ -1,0 +1,30 @@
+# =====================================================================
+# LSF Shared Resource Definitions - lsf.shared
+# =====================================================================
+
+Begin Cluster
+ClusterName
+eda_cluster
+End Cluster
+
+Begin HostType
+TYPENAME
+DEFAULT
+X86_64
+AARCH64
+End HostType
+
+Begin HostModel
+MODELNAME    CPUFACTOR     ARCHITECTURE
+Intel_Xeon   1.0           x86_64
+AMD_EPYC     1.2           x86_64
+ARM_Ampere   0.8           aarch64
+End HostModel
+
+Begin Resource
+RESOURCENAME  TYPE    INTERVAL INCREASING  DESCRIPTION
+# Resource Connector Resources
+googlehost    Boolean ()       ()          (Flag for instances launched from GCP)
+rc_account    String  ()       ()          (Resource Connector account name)
+eda_type      String  ()       ()          (Type of EDA workload: simulation, synthesis, sta)
+End Resource

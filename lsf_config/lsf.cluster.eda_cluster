@@ -1,0 +1,19 @@
+# =====================================================================
+# LSF Cluster Membership - lsf.cluster.eda_cluster
+# =====================================================================
+
+Begin Parameters
+# Allow dynamic hosts from on-prem (10.10.x.x) and GCP cloud (10.20.x.x) subnets to join
+LSF_HOST_ADDR_RANGE = 10.10.0-255.0-255 10.20.0-255.0-255
+End Parameters
+
+Begin ClusterAdmins
+ADMINISTRATORS = lsfadmin root
+End ClusterAdmins
+
+
+Begin Host
+HOSTNAME  model  type  server  r1m  mem  swp  RESOURCES
+master    !      !     1       -    -    -    ()
+submit    Intel_Xeon X86_64 0       -    -    -    ()
+End Host
