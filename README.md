@@ -57,8 +57,8 @@ If you are performing a fresh installation from scratch (rather than deploying f
     </tr>
     <tr>
       <td style="white-space: nowrap;" nowrap><strong><code>lsf10.1_lnx310-lib217-x86_64-602430.tar.Z</code></strong></td>
-      <td><em>Recommended</em></td>
-      <td>Cumulative LSF Service Pack 15 (SP15) binary update package.</td>
+      <td><strong>Required</strong></td>
+      <td>Cumulative LSF Service Pack 15 (SP15) update package (provides the LSF Resource Connector for GCP).</td>
     </tr>
   </tbody>
 </table>
