@@ -31,12 +31,12 @@ The environment is configured to run a complete, modern open-source EDA toolchai
 
 If you are performing a fresh installation from scratch (rather than deploying from pre-built Golden Images), you must create a local `Install_Files/` directory in the root of this repository and supply the following 4 customer-provided archives before running the upload and setup scripts:
 
-| Customer-Supplied Filename                         | Required / Optional | Description |
-| :------------------------------------------------- | :------------------ | :--- |
-| **`lsf_std_entitlement.dat`**                      | **Required**        | Customer's Standard Edition cluster license entitlement file. |
-| **`lsf10.1_lsfinstall_linux_x86_64.tar.Z`**        | **Required**        | LSF 10.1 base installer execution scripts and configuration wizards. |
-| **`lsf10.1_lnx310-lib217-x86_64.tar.Z`**            | **Required**        | Core LSF 10.1 distribution binaries for Linux (x86_64). |
-| **`lsf10.1_lnx310-lib217-x86_64-602430.tar.Z`**    | *Recommended*       | Cumulative LSF Service Pack 15 (SP15) binary update package. |
+| Customer-Supplied Filename&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; | Required / Optional | Description |
+| :----------------------------------------------------------------- | :------------------ | :--- |
+| <nobr>**`lsf_std_entitlement.dat`**</nobr>                         | **Required**        | Customer's Standard Edition cluster license entitlement file. |
+| <nobr>**`lsf10.1_lsfinstall_linux_x86_64.tar.Z`**</nobr>           | **Required**        | LSF 10.1 base installer execution scripts and configuration wizards. |
+| <nobr>**`lsf10.1_lnx310-lib217-x86_64.tar.Z`**</nobr>               | **Required**        | Core LSF 10.1 distribution binaries for Linux (x86_64). |
+| <nobr>**`lsf10.1_lnx310-lib217-x86_64-602430.tar.Z`**</nobr>       | *Recommended*       | Cumulative LSF Service Pack 15 (SP15) binary update package. |
 
 *(Note: If you are deploying the cluster using pre-built **Golden Images** where LSF binaries have already been pre-installed into the VM disk image, the `Install_Files/` directory is not needed.)*
 
