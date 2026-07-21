@@ -76,9 +76,9 @@ fi
 echo -n "5. Checking for customer-supplied LSF installer archives in Install_Files/... "
 INSTALL_DIR="Install_Files"
 REQUIRED_FILES=(
-    "lsf10.1_lnx310-lib217-x86_64.tar.Z"
-    "lsf10.1_lsfinstall_linux_x86_64.tar.Z"
     "lsf_std_entitlement.dat"
+    "lsf10.1_lsfinstall_linux_x86_64.tar.Z"
+    "lsf10.1_lnx310-lib217-x86_64.tar.Z"
     "lsf10.1_lnx310-lib217-x86_64-602430.tar.Z"
 )
 
