@@ -14,24 +14,31 @@ The environment is configured to run a complete, modern open-source EDA toolchai
 ---
 
 ## Table of Contents
-1. [Workspace Directory & Installer Files](#1-workspace-directory--installer-files)
+1. [IBM Spectrum LSF Licensed Software Requirements](#1-ibm-spectrum-lsf-licensed-software-requirements)
 2. [Hybrid Cloud Architecture](#2-hybrid-cloud-architecture)
 3. [Environment Blueprint](#3-environment-blueprint)
 4. [Deployment & Setup Guide](#4-deployment--setup-guide)
-5. [Running the Sample EDA Workflow](#5-running-the-sample-eda-workflow)
+5. [Cluster Verification & Functional Demonstrations](#5-cluster-verification--functional-demonstrations)
 
 ---
 
-## 1. Workspace Directory & Installer Files
+## 1. IBM Spectrum LSF Licensed Software Requirements
 
-The [Install_Files](Install_Files) directory has been cleaned up and flattened to contain only the 4 core LSF 10.1 installation packages and license files required to deploy this hybrid cluster. Unused enterprise bundles, client packages, and duplicate archives have been removed to minimize the repository footprint.
+> [!IMPORTANT]
+> **IBM Spectrum LSF is proprietary licensed software owned by IBM**. 
+> 
+> **No LSF installer packages, distribution binaries, or license entitlement files are bundled in this repository.** Customers and users are responsible for obtaining their own valid IBM Spectrum LSF 10.1 software packages and cluster entitlement files from their IBM Passport Advantage account or authorized IBM representative.
 
-| Filename | Size | Description |
+If you are performing a fresh installation from scratch (rather than deploying from pre-built Golden Images), you must create a local `Install_Files/` directory in the root of this repository and supply the following 4 customer-provided archives before running the upload and setup scripts:
+
+| Customer-Supplied Filename | Required / Optional | Description |
 | :--- | :--- | :--- |
-| **`lsf10.1_lsfinstall_linux_x86_64.tar.Z`** | 211 MB | LSF 10.1 installer execution scripts and configuration wizards. |
-| **`lsf10.1_lnx310-lib217-x86_64.tar.Z`** | 510 MB | Base LSF 10.1 distribution binaries for Linux (x86_64). |
-| **`lsf_std_entitlement.dat`** | 83 B | Standard Edition cluster license entitlement file. |
-| **`lsf10.1_lnx310-lib217-x86_64-602430.tar.Z`** | 834 MB | Cumulative LSF Service Pack 15 (SP15) binary update package. |
+| **`lsf10.1_lsfinstall_linux_x86_64.tar.Z`** | **Required** | LSF 10.1 base installer execution scripts and configuration wizards. |
+| **`lsf10.1_lnx310-lib217-x86_64.tar.Z`** | **Required** | Core LSF 10.1 distribution binaries for Linux (x86_64). |
+| **`lsf_std_entitlement.dat`** | **Required** | Customer's Standard Edition cluster license entitlement file. |
+| **`lsf10.1_lnx310-lib217-x86_64-602430.tar.Z`** | *Recommended* | Cumulative LSF Service Pack 15 (SP15) binary update package. |
+
+*(Note: If you are deploying the cluster using pre-built **Golden Images** where LSF binaries have already been pre-installed into the VM disk image, the `Install_Files/` directory is not needed.)*
 
 ---
 
@@ -124,7 +131,7 @@ LSF Hybrid Cloud: Pre-Flight Check
    -> API enabled: iam.googleapis.com
    -> API enabled: storage.googleapis.com
    -> API enabled: iamcredentials.googleapis.com
-5. Checking for required LSF installer archives... PASSED
+5. Checking for customer-supplied LSF installer archives in Install_Files/... PASSED (or SKIPPED if using Golden Images)
 ==================================================
 ALL PRE-FLIGHT CHECKS PASSED!
 You are ready to deploy: cd terraform && terraform apply -var="project_id=YOUR_GCP_PROJECT_ID"

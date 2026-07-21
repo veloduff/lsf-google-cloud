@@ -72,8 +72,8 @@ else
     echo "   Usage: ./preflight.sh <YOUR_GCP_PROJECT_ID>"
 fi
 
-# 4. Check LSF Installer Archives in Install_Files/
-echo -n "5. Checking for required LSF installer archives... "
+# 4. Check for Customer-Supplied LSF Installer Archives in Install_Files/ (Optional if using Golden Images)
+echo -n "5. Checking for customer-supplied LSF installer archives in Install_Files/... "
 INSTALL_DIR="Install_Files"
 REQUIRED_FILES=(
     "lsf10.1_lnx310-lib217-x86_64.tar.Z"
@@ -82,15 +82,20 @@ REQUIRED_FILES=(
     "lsf10.1_lnx310-lib217-x86_64-602430.tar.Z"
 )
 
+FOUND_COUNT=0
 for file in "${REQUIRED_FILES[@]}"; do
-    if [ ! -f "$INSTALL_DIR/$file" ]; then
-        echo "FAILED"
-        echo "ERROR: Required installer file '$file' not found in '$INSTALL_DIR/'."
-        echo "Please ensure all LSF installer files are present before proceeding."
-        exit 1
+    if [ -f "$INSTALL_DIR/$file" ]; then
+        FOUND_COUNT=$((FOUND_COUNT + 1))
     fi
 done
-echo "PASSED"
+
+if [ "$FOUND_COUNT" -eq "${#REQUIRED_FILES[@]}" ]; then
+    echo "PASSED (Customer installers found)"
+elif [ "$FOUND_COUNT" -eq 0 ]; then
+    echo "SKIPPED (No Install_Files/ found - required only for fresh LSF install without Golden Images)"
+else
+    echo "WARNING ($FOUND_COUNT of ${#REQUIRED_FILES[@]} files found in '$INSTALL_DIR/')"
+fi
 
 echo "=================================================="
 echo "ALL PRE-FLIGHT CHECKS PASSED!"
