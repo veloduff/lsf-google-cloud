@@ -31,32 +31,32 @@ The environment is configured to run a complete, modern open-source EDA toolchai
 
 If you are performing a fresh installation from scratch (rather than deploying from pre-built Golden Images), you must create a local `Install_Files/` directory in the root of this repository and supply the following 4 customer-provided archives before running the upload and setup scripts:
 
-<table>
+<table width="100%">
   <thead>
     <tr>
-      <th align="left" nowrap>Customer-Supplied Filename</th>
-      <th align="left">Required / Optional</th>
-      <th align="left">Description</th>
+      <th align="left" width="50%" style="min-width: 420px; white-space: nowrap;" nowrap>Customer-Supplied Filename</th>
+      <th align="left" width="20%">Required / Optional</th>
+      <th align="left" width="30%">Description</th>
     </tr>
   </thead>
   <tbody>
     <tr>
-      <td nowrap><strong><code>lsf_std_entitlement.dat</code></strong></td>
+      <td style="white-space: nowrap;" nowrap><strong><code>lsf_std_entitlement.dat</code></strong></td>
       <td><strong>Required</strong></td>
       <td>Customer's Standard Edition cluster license entitlement file.</td>
     </tr>
     <tr>
-      <td nowrap><strong><code>lsf10.1_lsfinstall_linux_x86_64.tar.Z</code></strong></td>
+      <td style="white-space: nowrap;" nowrap><strong><code>lsf10.1_lsfinstall_linux_x86_64.tar.Z</code></strong></td>
       <td><strong>Required</strong></td>
       <td>LSF 10.1 base installer execution scripts and configuration wizards.</td>
     </tr>
     <tr>
-      <td nowrap><strong><code>lsf10.1_lnx310-lib217-x86_64.tar.Z</code></strong></td>
+      <td style="white-space: nowrap;" nowrap><strong><code>lsf10.1_lnx310-lib217-x86_64.tar.Z</code></strong></td>
       <td><strong>Required</strong></td>
       <td>Core LSF 10.1 distribution binaries for Linux (x86_64).</td>
     </tr>
     <tr>
-      <td nowrap><strong><code>lsf10.1_lnx310-lib217-x86_64-602430.tar.Z</code></strong></td>
+      <td style="white-space: nowrap;" nowrap><strong><code>lsf10.1_lnx310-lib217-x86_64-602430.tar.Z</code></strong></td>
       <td><em>Recommended</em></td>
       <td>Cumulative LSF Service Pack 15 (SP15) binary update package.</td>
     </tr>
