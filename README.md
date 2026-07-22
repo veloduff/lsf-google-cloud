@@ -19,6 +19,7 @@ The environment is configured to run a complete, modern open-source EDA toolchai
 3. [Environment Blueprint](#3-environment-blueprint)
 4. [Deployment & Setup Guide](#4-deployment--setup-guide)
 5. [Cluster Verification & Functional Demonstrations](#5-cluster-verification--functional-demonstrations)
+6. [Production Optimization: Pre-Baking Golden Images](#6-production-optimization-pre-baking-golden-images)
 
 ---
 
@@ -172,22 +173,9 @@ You are ready to deploy: cd terraform && terraform apply -var="project_id=YOUR_G
 2. Initialize Terraform and apply the plan:
    ```bash
    terraform init
-   ```
-   ```bash
    terraform apply -var="project_id=YOUR_GCP_PROJECT_ID"
    ```
-This will output the public IP of the LSF Master and Submit hosts.
-
-##### Running with Pre-Built Golden Images (Production Flow)
-If you have already built LSF custom golden images in your GCP project, you can specify them as variables during the apply stage to boot both the Master and Submit VMs directly from your pre-configured images:
-```bash
-terraform apply \
-  -var="project_id=YOUR_GCP_PROJECT_ID" \
-  -var="master_image=lsf-master-rocky-8-image" \
-  -var="submit_image=lsf-submit-and-worker-rocky-8-image" \
-  -var="worker_image=lsf-submit-and-worker-rocky-8-image"
-```
-*Note: If these custom images do not exist in your GCP project yet, omit the `master_image`, `submit_image`, and `worker_image` variables. Terraform will default to public Rocky 8 images and automatically install all dependencies during VM boot.*
+   *This automatically provisions the VPC networks, Cloud NAT, GCS Bucket, and launches the initial Master and Submit VMs using standard public Rocky Linux 8 base images.*
 
 ### Step 4.1b: Using Existing VPCs (Optional)
 By default, the provided Terraform scripts automatically **create two new VPCs from scratch** (`lsf-onprem-vpc` and `lsf-cloud-vpc`) and peer them together. If you prefer to deploy into **existing VPC networks**, make the following 3 adjustments before running:
@@ -211,16 +199,19 @@ From the project root directory, run:
 ```bash
 ./upload_assets.sh
 ```
-Example successful output (when using pre-built Golden Images):
+Example successful output:
 ```text
 ==================================================
 LSF Hybrid Cloud: Uploading Assets to GCS
 ==================================================
 Retrieving GCS bucket name from Terraform state...
 Target bucket: gs://lsf-install-bucket-xxxxxx
-Checking LSF installation status on master VM...
- -> LSF is already installed on master VM. Skipping installer upload.
---- Skipping LSF installers upload block ---
+Verifying local installer files...
+Uploading customer-supplied LSF installers...
+Copying file://Install_Files/lsf_std_entitlement.dat to gs://lsf-install-bucket-xxxxxx/lsf_std_entitlement.dat
+Copying file://Install_Files/lsf10.1_lsfinstall_linux_x86_64.tar.Z to gs://lsf-install-bucket-xxxxxx/lsf10.1_lsfinstall_linux_x86_64.tar.Z
+Copying file://Install_Files/lsf10.1_lnx310-lib217-x86_64.tar.Z to gs://lsf-install-bucket-xxxxxx/lsf10.1_lnx310-lib217-x86_64.tar.Z
+Copying file://Install_Files/lsf10.1_lnx310-lib217-x86_64-602430.tar.Z to gs://lsf-install-bucket-xxxxxx/lsf10.1_lnx310-lib217-x86_64-602430.tar.Z
 Uploading LSF configuration directory...
 Copying file://lsf_config/user_data.sh to gs://lsf-install-bucket-xxxxxx/lsf_config/user_data.sh
 Copying file://lsf_config/lsb.resources to gs://lsf-install-bucket-xxxxxx/lsf_config/lsb.resources
@@ -235,9 +226,6 @@ Copying file://lsf_config/lsf.shared to gs://lsf-install-bucket-xxxxxx/lsf_confi
 Copying file://lsf_config/hostProviders.json to gs://lsf-install-bucket-xxxxxx/lsf_config/hostProviders.json
 Copying file://lsf_config/lsf.cluster.eda_cluster to gs://lsf-install-bucket-xxxxxx/lsf_config/lsf.cluster.eda_cluster
 Copying file://lsf_config/setup_master.sh to gs://lsf-install-bucket-xxxxxx/lsf_config/setup_master.sh
-  Completed files 13/13 | 25.3kiB/25.3kiB
-
-Average throughput: 175.6kiB/s
 Uploading EDA sample workflow directory...
 Copying file://eda_workflow/submit_regression.sh to gs://lsf-install-bucket-xxxxxx/eda_workflow/submit_regression.sh
 Copying file://eda_workflow/synthesis.ys to gs://lsf-install-bucket-xxxxxx/eda_workflow/synthesis.ys
@@ -246,15 +234,10 @@ Copying file://eda_workflow/run_eda_job.sh to gs://lsf-install-bucket-xxxxxx/eda
 Copying file://eda_workflow/run_regression_task.sh to gs://lsf-install-bucket-xxxxxx/eda_workflow/run_regression_task.sh
 Copying file://eda_workflow/counter.v to gs://lsf-install-bucket-xxxxxx/eda_workflow/counter.v
 Copying file://eda_workflow/counter_tb.v to gs://lsf-install-bucket-xxxxxx/eda_workflow/counter_tb.v
-  Completed files 7/7 | 8.1kiB/8.1kiB
-
-Average throughput: 58.9kiB/s
 Uploading Submit & Scaling test scripts directory...
 Copying file://submit_scripts/scale_10_job.sh to gs://lsf-install-bucket-xxxxxx/submit_scripts/scale_10_job.sh
 Copying file://submit_scripts/submit_scale_10.sh to gs://lsf-install-bucket-xxxxxx/submit_scripts/submit_scale_10.sh
 Copying file://submit_scripts/monitor_scaling.sh to gs://lsf-install-bucket-xxxxxx/submit_scripts/monitor_scaling.sh
-  Completed files 3/3 | 3.1kiB/3.1kiB
-
 ==================================================
 ALL ASSETS UPLOADED SUCCESSFULLY TO:
 gs://lsf-install-bucket-xxxxxx/
@@ -283,21 +266,11 @@ We have provided an automated installation script ([`lsf_config/setup_master.sh`
 #### About the `setup_master.sh` Script & Daemon Management
 
 The [`lsf_config/setup_master.sh`](lsf_config/setup_master.sh) script handles the complete bootstrapping of the LSF Master node:
-1.  **Extracts LSF binaries**: Automates the base installation and applies cumulative Service Pack 15 patches silently (skipped automatically if pre-installed Golden Images are used).
+1.  **Extracts LSF binaries**: Automates the base installation and applies cumulative Service Pack 15 patches silently.
 2.  **Applies Cluster Configurations**: Configures queues, resource limits, host metrics, and dynamically substitutes GCE template metadata.
 3.  **Sanitizes Event History**: Wipes historical job logs and accounting records under `/opt/lsf/work` to guarantee a clean scheduler state starting at Job ID 1.
 4.  **Configures eauth SUID permissions**: Grants root ownership and SUID execute permissions to the `eauth` authentication binary.
 5.  **Initializes LSF Cluster Daemons**: Starts the core cluster services (`lim`, `res`, and `sbatchd`).
-
-### Step 4.3b: Build the LSF Cloud Worker Golden Image
-The dynamic cloud worker instances started by LSF rely on a custom machine image that has Miniconda, system libraries, and the open-source EDA tools stack pre-installed.
-
-1. To build and register this image in your GCP project, follow the instructions in the [Golden Image Guide](GOLDEN_IMAGE.md).
-2. Alternatively, from the project root directory, run the automated GCE image builder pipeline script:
-   ```bash
-   ./lsf_config/build_golden_image.sh
-   ```
-*Note: This step must be completed before you submit batch workloads to the `eda` queue, as the Resource Connector cannot provision VMs without this image.*
 
 ---
 
@@ -325,8 +298,17 @@ cd /home/lsfadmin/submit_scripts
 ```
 *This requests 20 concurrent slots on the `eda` queue (`-n 20`). Since each `c2-standard-4` template exposes 2 slots, LSF triggers the simultaneous provisioning of 10 dynamic worker VMs in GCP.*
 
-#### 2. Live Monitoring of Auto-Scaling
-We provide a live dashboard script to monitor job queueing, VM provisioning, and host registrations in real time:
+#### 2. Visual GCP Console Progression
+Watch the Compute Engine Console as LSF automatically scales the dynamic worker pool:
+
+* **Idle Cluster Baseline**: Only the static `lsf-master` and `lsf-submit` VMs are active in the on-premises subnet (`10.10.0.0/16`):
+![Idle Cluster Baseline in GCP Console](docs/images/gcp_console_idle.png)
+
+* **Dynamically Scaled Cluster**: When the parallel workload is submitted, the LSF Resource Connector automatically provisions 10 dynamic `c2-standard-4` worker instances (`compute-*`) in the cloud worker subnet (`10.20.0.0/16`):
+![Scaled-Up Dynamic Worker Pool in GCP Console](docs/images/gcp_console_scaled.png)
+
+#### 3. Live Dashboard & CLI Monitoring
+We provide a live terminal dashboard script to monitor job queueing, VM provisioning, and host registrations in real time:
 ```bash
 ./monitor_scaling.sh
 ```
@@ -337,7 +319,7 @@ You can also monitor the scaling lifecycle via standard LSF and GCP commands:
 *   **Watch GCP VM Provisioning**: In your local machine terminal, run `gcloud compute instances list` to watch `lsf-gcp-eda-sim-spot-xxxx` VMs transition from `PROVISIONING` to `RUNNING`.
 *   **Watch Scale-Down**: Once the job finishes, the instances remain idle for 2 minutes (`provHostIdleDelay`) and are automatically deleted by LSF Resource Connector.
 
-#### Example Auto-Scaling Lifecycle Output
+#### 4. Example Auto-Scaling Lifecycle Output
 Here is the expected terminal output showing the complete auto-scaling progression—from initial queue demand (`PEND`), dynamic provisioning across 10 GCE cloud worker hosts (`compute-worker001` .. `compute-worker010`), parallel workload execution (`RUN`), and automatic cloud scale-down back to only the static master host:
 
 ```text
@@ -424,3 +406,32 @@ Run an industry-standard multi-seed regression suite using an LSF Job Array (`-J
 *   Each task executes `run_regression_task.sh`, reading `$LSB_JOBINDEX` to generate a unique random test seed.
 *   Outputs for each task are isolated in separate sandboxes (`runs/run_1/` through `runs/run_100/`), preventing file collisions on the shared NFS storage.
 *   Monitor array progress using `bjobs` or `bjobs -A`.
+
+---
+
+## 6. Production Optimization: Pre-Baking Golden Images
+
+In the baseline deployment above, dynamic cloud workers download configuration assets and install tools during their initial startup. For enterprise production clusters, you can eliminate on-boot package downloads and significantly accelerate worker launch times by **pre-baking custom Google Compute Engine Golden Images**.
+
+### Benefits of Pre-Baking Golden Images
+*   **Faster Cloud Bursting**: Dynamic worker instances boot and join the LSF cluster in seconds.
+*   **Air-Gapped & Deterministic**: Guarantees fixed tool versions (`iverilog`, `yosys`, `openroad`, `verilator`, `magic`, `netgen`) without relying on external repositories during worker startup.
+
+### 1. Build the Golden Image
+Run the automated image builder pipeline from the repository root:
+```bash
+./lsf_config/build_golden_image.sh
+```
+*This launches a temporary build VM, installs all OS dependencies, Miniconda, and the open-source EDA suite, creates the custom image `lsf-submit-and-worker-rocky-8-image` (Family: `lsf-rocky-8`), and cleans up the temporary builder VM.*
+*(For detailed manual steps, see the [Golden Image Guide](GOLDEN_IMAGE.md).)*
+
+### 2. Redeploy Terraform with Golden Images
+Once your Golden Images exist in your GCP project, specify them as variables during the Terraform apply stage to boot both the Master/Submit VMs and dynamic cloud workers directly from your pre-baked images:
+```bash
+cd terraform
+terraform apply \
+  -var="project_id=YOUR_GCP_PROJECT_ID" \
+  -var="master_image=lsf-master-rocky-8-image" \
+  -var="submit_image=lsf-submit-and-worker-rocky-8-image" \
+  -var="worker_image=lsf-submit-and-worker-rocky-8-image"
+```
