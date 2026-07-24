@@ -10,9 +10,9 @@ variable "region" {
 }
 
 variable "zone" {
-  description = "The default GCP zone to deploy the LSF master and submit VMs."
+  description = "The default GCP zone to deploy the LSF master and submit VMs. Defaults to <region>-a if not specified."
   type        = string
-  default     = "us-central1-a"
+  default     = null
 }
 
 variable "onprem_cidr" {
@@ -54,5 +54,18 @@ variable "submit_image" {
 variable "worker_image" {
   description = "The GCE custom image name used by dynamic cloud workers."
   type        = string
-  default     = "rocky-linux-cloud/rocky-linux-8-optimized-gcp"
+  default     = "lsf-submit-and-worker-rocky-8-image"
 }
+
+variable "bucket_name" {
+  description = "Optional custom name for the GCS installation bucket. Defaults to lsf-install-bucket-<random_id> if not specified."
+  type        = string
+  default     = null
+}
+
+variable "bucket_location" {
+  description = "The GCS location (region or multi-region) for the installation bucket."
+  type        = string
+  default     = "US"
+}
+

@@ -9,7 +9,20 @@
 
 set -e
 
-PROJECT_ID="$1"
+get_tfvar() {
+    local var_name="$1"
+    local tfvars_file=""
+    if [ -f "terraform/terraform.tfvars" ]; then
+        tfvars_file="terraform/terraform.tfvars"
+    elif [ -f "../terraform/terraform.tfvars" ]; then
+        tfvars_file="../terraform/terraform.tfvars"
+    fi
+    if [ -n "$tfvars_file" ]; then
+        grep -E "^\s*${var_name}\s*=" "$tfvars_file" 2>/dev/null | awk -F'=' '{print $2}' | tr -d ' "' | head -n 1 || true
+    fi
+}
+
+PROJECT_ID="${1:-${TF_VAR_project_id:-$(get_tfvar "project_id")}}"
 
 echo "=================================================="
 echo "LSF Hybrid Cloud: Pre-Flight Check"
@@ -44,7 +57,7 @@ fi
 echo "PASSED"
 
 # 3. Check GCP Project Access & Enabled APIs
-if [ -n "$PROJECT_ID" ]; then
+if [ -n "$PROJECT_ID" ] && [ "$PROJECT_ID" != "(unset)" ]; then
     echo -n "3. Checking access to GCP Project '$PROJECT_ID'... "
     if ! gcloud projects describe "$PROJECT_ID" &> /dev/null; then
         echo "FAILED"
@@ -68,7 +81,7 @@ if [ -n "$PROJECT_ID" ]; then
         fi
     done
 else
-    echo "3. NOTE: No GCP Project ID provided as argument. Skipping API validation."
+    echo "3. NOTE: No GCP Project ID provided as argument or in terraform.tfvars. Skipping API validation."
     echo "   Usage: ./preflight.sh <YOUR_GCP_PROJECT_ID>"
 fi
 
@@ -99,8 +112,8 @@ fi
 
 echo "=================================================="
 echo "ALL PRE-FLIGHT CHECKS PASSED!"
-if [ -n "$PROJECT_ID" ]; then
-    echo "You are ready to deploy: cd terraform && terraform apply -var=\"project_id=$PROJECT_ID\""
+if [ -n "$PROJECT_ID" ] && [ "$PROJECT_ID" != "(unset)" ]; then
+    echo "You are ready to deploy: cd terraform && terraform apply"
 else
     echo "You are ready to deploy your Terraform infrastructure."
 fi

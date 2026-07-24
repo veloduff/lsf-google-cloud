@@ -21,6 +21,10 @@ provider "google" {
   region  = var.region
 }
 
+locals {
+  zone = coalesce(var.zone, "${var.region}-a")
+}
+
 # Resource for generating unique names
 resource "random_id" "bucket_suffix" {
   byte_length = 4
@@ -252,8 +256,8 @@ resource "google_project_iam_member" "sa_user" {
 # ==========================================
 
 resource "google_storage_bucket" "lsf_install_bucket" {
-  name                        = "lsf-install-bucket-${random_id.bucket_suffix.hex}"
-  location                    = "US"
+  name                        = var.bucket_name != null && var.bucket_name != "" ? var.bucket_name : "lsf-install-bucket-${random_id.bucket_suffix.hex}"
+  location                    = var.bucket_location
   force_destroy               = true
   uniform_bucket_level_access = true
 }
@@ -274,7 +278,7 @@ resource "google_storage_bucket_iam_member" "bucket_viewer" {
 resource "google_compute_instance" "lsf_master" {
   name         = "lsf-master"
   machine_type = var.master_machine_type
-  zone         = var.zone
+  zone         = local.zone
   depends_on   = [time_sleep.wait_for_sa]
 
   boot_disk {
@@ -340,7 +344,7 @@ resource "google_compute_instance" "lsf_master" {
 resource "google_compute_instance" "lsf_submit" {
   name         = "lsf-submit"
   machine_type = var.submit_machine_type
-  zone         = var.zone
+  zone         = local.zone
 
   boot_disk {
     initialize_params {
@@ -419,7 +423,7 @@ resource "google_compute_instance" "lsf_submit" {
 
 resource "google_dns_managed_zone" "cloud_dns_peering" {
   name        = "cloud-dns-peering"
-  dns_name    = "c.lsf-testing-001.internal."
+  dns_name    = "c.${var.project_id}.internal."
   description = "Peer forward DNS from onprem VPC to cloud VPC"
   visibility  = "private"
 
@@ -454,4 +458,6 @@ resource "google_dns_managed_zone" "cloud_reverse_dns_peering" {
     }
   }
 }
+
+
 

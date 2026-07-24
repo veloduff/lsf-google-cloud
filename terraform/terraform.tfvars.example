@@ -1,0 +1,15 @@
+# =====================================================================
+# Terraform Variable Definitions (terraform.tfvars)
+# =====================================================================
+# Copy this file to 'terraform.tfvars' and set your custom values.
+# Values defined here WILL PERSIST across all terraform commands and helper scripts.
+
+project_id      = "your-gcp-project-id"
+region          = "us-central1"
+zone            = "us-central1-a"
+
+# Optional: Custom GCS Bucket Name (defaults to lsf-install-bucket-<random_id>)
+# bucket_name   = "my-custom-lsf-bucket"
+
+# Optional: GCS Location (defaults to US)
+# bucket_location = "US"

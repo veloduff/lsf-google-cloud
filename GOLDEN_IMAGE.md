@@ -23,10 +23,11 @@ Sharing the LSF core configuration and binaries via NFS `/opt/lsf` keeps the ima
 An automated script `lsf_config/build_golden_image.sh` is provided in the repository to spin up a temporary VM, execute the installations, capture the disk image, and clean up GCE resources.
 
 ### Running the Build Script
-From your local workspace, run the following command:
+From your local workspace, run the script. It automatically auto-detects your Project ID, Region, Zone, and Subnet from `terraform/terraform.tfvars` or `gcloud config`:
 ```bash
 ./lsf_config/build_golden_image.sh
 ```
+*(You can also override parameters explicitly via CLI flags: `./lsf_config/build_golden_image.sh --project=YOUR_PROJECT --region=YOUR_REGION --zone=YOUR_ZONE`)*
 
 ### Script Workflow
 1. **Launches Temporary VM**: Creates a temporary instance `lsf-golden-build` in GCE.
@@ -44,6 +45,11 @@ If the current GCP project is temporary and will be deleted, you must copy the c
 Because corporate GCP environments often enable organization policies restricting direct image copies (`constraints/compute.trustedImageProjects`), you can use GCE snapshots to easily migrate images without violating constraints.
 
 ### 1. Migrating Image to a Persistent Project (Workaround for Policy Constraints)
+First, source your environment variables from `terraform/terraform.tfvars`:
+```bash
+source ./set_env.sh
+```
+
 Run these commands in your terminal to safely replicate the image:
 
 ```bash
@@ -51,54 +57,55 @@ Run these commands in your terminal to safely replicate the image:
 gcloud compute disks create temp-worker-disk \
     --image="lsf-submit-and-worker-rocky-8-image" \
     --project="lsf-testing-001" \
-    --zone="us-central1-a"
+    --zone="${TF_VAR_zone:-us-central1-a}"
 
 # B. Create a snapshot from that disk
 gcloud compute snapshots create worker-snapshot \
     --source-disk="temp-worker-disk" \
-    --source-disk-zone="us-central1-a" \
+    --source-disk-zone="${TF_VAR_zone:-us-central1-a}" \
     --project="lsf-testing-001"
 
 # C. Create a disk in your persistent target project from the snapshot
 gcloud compute disks create temp-worker-disk-dest \
     --source-snapshot="projects/lsf-testing-001/global/snapshots/worker-snapshot" \
     --project="persistent-project-shared-data" \
-    --zone="us-central1-a"
+    --zone="${TF_VAR_zone:-us-central1-a}"
 
 # D. Register the final Golden Image in your persistent project
 gcloud compute images create lsf-submit-and-worker-rocky-8-image \
     --source-disk="temp-worker-disk-dest" \
-    --source-disk-zone="us-central1-a" \
+    --source-disk-zone="${TF_VAR_zone:-us-central1-a}" \
     --project="persistent-project-shared-data" \
     --family="lsf-rocky-8"
 ```
 
-### 2. Migrating the Master Image to a Persistent Project
-Run these commands in your terminal to safely replicate the LSF Master image:
+### 2. Migrating the Master Image to a Persistent Project (Optional)
+> [!NOTE]
+> `build_golden_image.sh` builds a single consolidated worker/submit image named `lsf-submit-and-worker-rocky-8-image`. If an administrator chooses to manually capture the Master VM disk *after* running `setup_master.sh` into a custom image named `lsf-master-rocky-8-image`, run these commands to replicate it:
 
 ```bash
 # A. Create a temporary disk in the source project from the master image
 gcloud compute disks create temp-master-disk \
     --image="lsf-master-rocky-8-image" \
     --project="lsf-testing-001" \
-    --zone="us-central1-a"
+    --zone="${TF_VAR_zone:-us-central1-a}"
 
 # B. Create a snapshot from that disk
 gcloud compute snapshots create master-snapshot \
     --source-disk="temp-master-disk" \
-    --source-disk-zone="us-central1-a" \
+    --source-disk-zone="${TF_VAR_zone:-us-central1-a}" \
     --project="lsf-testing-001"
 
 # C. Create a disk in your persistent target project from the snapshot
 gcloud compute disks create temp-master-disk-dest \
     --source-snapshot="projects/lsf-testing-001/global/snapshots/master-snapshot" \
     --project="persistent-project-shared-data" \
-    --zone="us-central1-a"
+    --zone="${TF_VAR_zone:-us-central1-a}"
 
 # D. Register the final Master Image in your persistent project
 gcloud compute images create lsf-master-rocky-8-image \
     --source-disk="temp-master-disk-dest" \
-    --source-disk-zone="us-central1-a" \
+    --source-disk-zone="${TF_VAR_zone:-us-central1-a}" \
     --project="persistent-project-shared-data" \
     --family="lsf-rocky-8"
 ```
@@ -110,7 +117,7 @@ After both worker/submit and master images have been successfully registered in 
 # --- Clean Up Source Project (lsf-testing-001) ---
 gcloud compute disks delete temp-worker-disk temp-master-disk \
     --project="lsf-testing-001" \
-    --zone="us-central1-a" \
+    --zone="${TF_VAR_zone:-us-central1-a}" \
     --quiet
 
 gcloud compute snapshots delete worker-snapshot master-snapshot \
@@ -120,7 +127,7 @@ gcloud compute snapshots delete worker-snapshot master-snapshot \
 # --- Clean Up Destination Project (persistent-project-shared-data) ---
 gcloud compute disks delete temp-worker-disk-dest temp-master-disk-dest \
     --project="persistent-project-shared-data" \
-    --zone="us-central1-a" \
+    --zone="${TF_VAR_zone:-us-central1-a}" \
     --quiet
 ```
 
