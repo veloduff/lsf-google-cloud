@@ -4,14 +4,115 @@
 # =====================================================================
 set -euo pipefail
 
-PROJECT_ID="lsf-testing-001"
-ZONE="us-central1-a"
-SUBNET="lsf-cloud-subnet"
+# Helper function to read a variable from terraform/terraform.tfvars if present
+get_tfvar() {
+    local var_name="$1"
+    local tfvars_file=""
+    if [ -f "terraform/terraform.tfvars" ]; then
+        tfvars_file="terraform/terraform.tfvars"
+    elif [ -f "../terraform/terraform.tfvars" ]; then
+        tfvars_file="../terraform/terraform.tfvars"
+    fi
+    if [ -n "$tfvars_file" ]; then
+        grep -E "^\s*${var_name}\s*=" "$tfvars_file" 2>/dev/null | awk -F'=' '{print $2}' | tr -d ' "' | head -n 1 || true
+    fi
+}
+
+# Initialize variables safely for set -u
+CLI_PROJECT_ID=""
+CLI_REGION=""
+CLI_ZONE=""
+CLI_SUBNET=""
+POSITIONAL_ARGS=()
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --project=*)
+      CLI_PROJECT_ID="${1#*=}"
+      shift
+      ;;
+    --project)
+      CLI_PROJECT_ID="$2"
+      shift 2
+      ;;
+    --region=*)
+      CLI_REGION="${1#*=}"
+      shift
+      ;;
+    --region)
+      CLI_REGION="$2"
+      shift 2
+      ;;
+    --zone=*)
+      CLI_ZONE="${1#*=}"
+      shift
+      ;;
+    --zone)
+      CLI_ZONE="$2"
+      shift 2
+      ;;
+    --subnet=*)
+      CLI_SUBNET="${1#*=}"
+      shift
+      ;;
+    --subnet)
+      CLI_SUBNET="$2"
+      shift 2
+      ;;
+    *)
+      POSITIONAL_ARGS+=("$1")
+      shift
+      ;;
+  esac
+done
+
+POS1="${POSITIONAL_ARGS[0]:-}"
+POS2="${POSITIONAL_ARGS[1]:-}"
+
+TF_PROJECT="${TF_VAR_project_id:-}"
+TF_REGION="${TF_VAR_region:-}"
+TF_ZONE="${TF_VAR_zone:-}"
+
+# Determine Project ID (CLI flag > Positional arg > TF_VAR_project_id > terraform.tfvars > gcloud config)
+PROJECT_ID="${CLI_PROJECT_ID:-${POS1:-${TF_PROJECT:-$(get_tfvar "project_id")}}}"
+if [ -z "$PROJECT_ID" ] || [ "$PROJECT_ID" = "(unset)" ]; then
+    PROJECT_ID="$(gcloud config get-value project 2>/dev/null || true)"
+fi
+
+# Determine Region and Zone (CLI flag/arg > TF_VAR_* > terraform.tfvars > gcloud config)
+REGION="${CLI_REGION:-${TF_REGION:-$(get_tfvar "region")}}"
+if [ -z "$REGION" ] || [ "$REGION" = "(unset)" ]; then
+    REGION="$(gcloud config get-value compute/region 2>/dev/null || true)"
+fi
+REGION="${REGION:-us-central1}"
+
+ZONE="${CLI_ZONE:-${POS2:-${TF_ZONE:-$(get_tfvar "zone")}}}"
+if [ -z "$ZONE" ] || [ "$ZONE" = "(unset)" ]; then
+    ZONE="$(gcloud config get-value compute/zone 2>/dev/null || true)"
+fi
+
+# If zone is not set, derive from region
+if [ -z "$ZONE" ] || [ "$ZONE" = "(unset)" ]; then
+    ZONE="${REGION}-a"
+fi
+
+SUBNET="${CLI_SUBNET:-lsf-cloud-subnet}"
 BUILD_VM="lsf-golden-build"
 IMAGE_NAME="lsf-submit-and-worker-rocky-8-image"
 
+if [ -z "$PROJECT_ID" ] || [ "$PROJECT_ID" = "(unset)" ]; then
+    echo "ERROR: GCP Project ID is required. Please specify via --project, TF_VAR_project_id, terraform/terraform.tfvars, or gcloud config."
+    exit 1
+fi
+
 echo "=================================================="
 echo "Starting Golden Image Build Pipeline for LSF Workers"
+echo "=================================================="
+echo " Project ID : ${PROJECT_ID}"
+echo " Region     : ${REGION}"
+echo " Zone       : ${ZONE}"
+echo " Subnet     : ${SUBNET}"
+echo " Image Name : ${IMAGE_NAME}"
 echo "=================================================="
 
 # 1. Spin up temporary builder VM
@@ -21,7 +122,7 @@ gcloud compute instances create "$BUILD_VM" \
     --zone="$ZONE" \
     --machine-type="c2-standard-4" \
     --subnet="$SUBNET" \
-    --service-account="lsf-resource-connector-sa@lsf-testing-001.iam.gserviceaccount.com" \
+    --service-account="lsf-resource-connector-sa@${PROJECT_ID}.iam.gserviceaccount.com" \
     --scopes="https://www.googleapis.com/auth/cloud-platform" \
     --image-project="rocky-linux-cloud" \
     --image-family="rocky-linux-8-optimized-gcp" \
@@ -35,7 +136,21 @@ gcloud compute instances create "$BUILD_VM" \
 
 # Wait for SSH to become ready
 echo "Waiting for VM to initialize and SSH to become ready..."
-sleep 35
+SSH_READY=false
+for i in {1..12}; do
+    if gcloud compute ssh "$BUILD_VM" --project="$PROJECT_ID" --zone="$ZONE" --tunnel-through-iap --command="true" --quiet &>/dev/null; then
+        SSH_READY=true
+        echo " -> SSH is ready!"
+        break
+    fi
+    echo " -> SSH not ready yet (attempt $i/12). Retrying in 10s..."
+    sleep 10
+done
+
+if [ "$SSH_READY" = "false" ]; then
+    echo "ERROR: Unable to connect to '$BUILD_VM' via SSH after 120 seconds."
+    exit 1
+fi
 
 # 2. Run dependency and package installation commands inside the VM
 echo "Step 2: Installing OS dependencies, Miniconda, and EDA tools..."

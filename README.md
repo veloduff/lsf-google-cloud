@@ -20,6 +20,7 @@ The environment is configured to run a complete, modern open-source EDA toolchai
 4. [Deployment & Setup Guide](#4-deployment--setup-guide)
 5. [Cluster Verification & Functional Demonstrations](#5-cluster-verification--functional-demonstrations)
 6. [Production Optimization: Pre-Baking Golden Images](#6-production-optimization-pre-baking-golden-images)
+7. [Teardown & Clean-Up Guide](#7-teardown--clean-up-guide)
 
 ---
 
@@ -132,17 +133,30 @@ To set up and validate this environment, the repository provides two core functi
 
 ## 4. Deployment & Setup Guide
 
-### Step 4.0: Google Cloud Authentication Setup
-Before deploying, ensure your local `gcloud` CLI and Application Default Credentials (ADC) sessions are authenticated to your GCP project:
-```bash
-gcloud auth login
-gcloud auth application-default login
-```
+### Step 4.0: Google Cloud Authentication & Environment Setup
+1. Authenticate your local `gcloud` CLI and Application Default Credentials (ADC) sessions:
+   ```bash
+   gcloud auth login
+   gcloud auth application-default login
+   ```
+2. **Persist your environment parameters in code**: Copy `terraform/terraform.tfvars.example` to `terraform/terraform.tfvars` and set your GCP Project ID, region, zone, and custom bucket details:
+   ```bash
+   cp terraform/terraform.tfvars.example terraform/terraform.tfvars
+   ```
+   Edit `terraform/terraform.tfvars` to set your desired parameters (these will automatically persist across all Terraform commands and helper scripts):
+   ```hcl
+   project_id      = "your-gcp-project-id"
+   region          = "us-central1"
+   zone            = "us-central1-a"
+   bucket_name     = "your-custom-gcs-bucket-name" # Optional
+   bucket_location = "US"                        # Optional
+   ```
+   *(Alternatively, you can export environment variables such as `export TF_VAR_project_id="your-gcp-project-id"`, `export TF_VAR_region="your-region"`, `export TF_VAR_bucket_name="your-bucket"`).*
 
 ### Step 4.0b: Run Pre-Flight Checks
-Next, run our automated pre-flight check script to verify that your CLI tools, active authentication sessions (CLI & ADC), project APIs, and LSF installer archives are ready:
+Next, run our automated pre-flight check script to verify that your CLI tools, active authentication sessions (CLI & ADC), project APIs, and LSF installer archives are ready (it automatically reads from `terraform/terraform.tfvars`):
 ```bash
-./preflight.sh YOUR_GCP_PROJECT_ID
+./preflight.sh
 ```
 Example successful output:
 ```text
@@ -151,7 +165,7 @@ LSF Hybrid Cloud: Pre-Flight Check
 ==================================================
 1. Checking required CLI tools (terraform, gcloud)... PASSED
 2. Checking Google Cloud authentication & ADC token... PASSED
-3. Checking access to GCP Project 'YOUR_GCP_PROJECT_ID'... PASSED
+3. Checking access to GCP Project 'your-gcp-project-id'... PASSED
 4. Verifying required GCP APIs (compute, iam, storage)...
    -> API enabled: compute.googleapis.com
    -> API enabled: iam.googleapis.com
@@ -160,7 +174,7 @@ LSF Hybrid Cloud: Pre-Flight Check
 5. Checking for customer-supplied LSF installer archives in Install_Files/... PASSED (or SKIPPED if using Golden Images)
 ==================================================
 ALL PRE-FLIGHT CHECKS PASSED!
-You are ready to deploy: cd terraform && terraform apply -var="project_id=YOUR_GCP_PROJECT_ID"
+You are ready to deploy: cd terraform && terraform apply
 ==================================================
 ```
 *If your credentials have expired or required APIs are disabled, the script will catch it immediately and instruct you on how to resolve it before running Terraform.*
@@ -170,10 +184,10 @@ You are ready to deploy: cd terraform && terraform apply -var="project_id=YOUR_G
    ```bash
    cd terraform
    ```
-2. Initialize Terraform and apply the plan:
+2. Initialize Terraform and apply the plan (Terraform automatically reads `terraform.tfvars`):
    ```bash
    terraform init
-   terraform apply -var="project_id=YOUR_GCP_PROJECT_ID"
+   terraform apply
    ```
    *This automatically provisions the VPC networks, Cloud NAT, GCS Bucket, and launches the initial Master and Submit VMs using standard public Rocky Linux 8 base images.*
 
@@ -195,8 +209,9 @@ By default, the provided Terraform scripts automatically **create two new VPCs f
 
 ### Step 4.2: Upload LSF Installers & Configs to GCS Bucket
 We have provided an automated upload script ([`upload_assets.sh`](upload_assets.sh)) that retrieves the bucket name directly from Terraform and handles the entire upload process using the fast Google Cloud Storage CLI.
-From the project root directory, run:
+From the project root directory (navigate back from the `terraform` directory first), run:
 ```bash
+cd ..
 ./upload_assets.sh
 ```
 Example successful output:
@@ -246,10 +261,11 @@ gs://lsf-install-bucket-xxxxxx/
 
 ### Step 4.3: Install & Configure the LSF Master (On-Prem)
 We have provided an automated installation script ([`lsf_config/setup_master.sh`](lsf_config/setup_master.sh)) that silently installs LSF, applies the EDA and GCP Resource Connector configurations, and starts the cluster daemons.
-1. SSH into the LSF Master VM (using IAP TCP forwarding for internal-only VMs):
+1. SSH into the LSF Master VM using our automated helper script (auto-detects project & zone from `terraform/terraform.tfvars` or GCE):
    ```bash
-   gcloud compute ssh lsf-master --zone=us-central1-a --tunnel-through-iap
+   ./ssh_master.sh
    ```
+   *(Or manually with auto-detected zone: `gcloud compute ssh lsf-master --zone=$(gcloud compute instances list --filter="name=lsf-master" --format="value(zone)") --tunnel-through-iap`)*
 2. Download the configuration folder from GCS and run the automated setup script:
    ```bash
    BUCKET_NAME=$(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/attributes/lsf_bucket)
@@ -279,8 +295,7 @@ The [`lsf_config/setup_master.sh`](lsf_config/setup_master.sh) script handles th
 Once your LSF Master and Submit VMs are up, log into the Submit host to execute the two functional demonstration components:
 
 ```bash
-gcloud compute ssh lsf-submit --zone=us-central1-a --tunnel-through-iap
-sudo /bin/su - lsfadmin
+./ssh_submit.sh
 ```
 *(Both `submit_scripts/` and `eda_workflow/` are automatically populated in `/home/lsfadmin/` during Master VM setup and shared to the Submit host via NFS.)*
 
@@ -430,8 +445,46 @@ Once your Golden Images exist in your GCP project, specify them as variables dur
 ```bash
 cd terraform
 terraform apply \
-  -var="project_id=YOUR_GCP_PROJECT_ID" \
-  -var="master_image=lsf-master-rocky-8-image" \
+  -var="master_image=lsf-submit-and-worker-rocky-8-image" \
   -var="submit_image=lsf-submit-and-worker-rocky-8-image" \
   -var="worker_image=lsf-submit-and-worker-rocky-8-image"
+```
+
+---
+
+## 7. Teardown & Clean-Up Guide
+
+Once your testing is complete, follow these steps to destroy all provisioned GCP resources and avoid ongoing cloud infrastructure charges.
+
+### Step 7.1: Terminate Active Jobs & Dynamic Cloud Workers
+Before destroying the core infrastructure, ensure any active workloads are stopped so LSF Resource Connector can release dynamic worker VMs:
+
+1. SSH into the Submit VM (or Master VM) as `lsfadmin` and cancel any running or queued jobs:
+   ```bash
+   bkill 0
+   ```
+2. Wait a couple of minutes for LSF to automatically terminate idle cloud worker VMs (`compute-*`), or list active instances from your local terminal to verify:
+   ```bash
+   gcloud compute instances list
+   ```
+   *(If dynamic worker instances remain active, you can force-delete them via `gcloud compute instances delete <instance-name> --zone=<zone>`)*
+
+### Step 7.2: Destroy Infrastructure via Terraform
+1. Navigate to the `terraform` directory in your local workspace:
+   ```bash
+   cd terraform
+   ```
+2. Run `terraform destroy` to tear down all provisioned resources (VPCs, Subnets, Routers, Cloud NAT, Firewall Rules, Service Accounts, Master/Submit VMs, and GCS Bucket):
+   ```bash
+   terraform destroy
+   ```
+   *(When prompted, type `yes` to confirm resource deletion.)*
+
+> [!NOTE]
+> The GCS installation bucket (`google_storage_bucket.lsf_install_bucket`) has `force_destroy = true` enabled in Terraform. Running `terraform destroy` automatically removes the bucket along with all uploaded LSF software archives and configuration files.
+
+### Step 7.3: (Optional) Delete Custom Golden Images
+If you created pre-baked GCE Golden Images using `build_golden_image.sh`, delete them if they are no longer required to prevent storage costs:
+```bash
+gcloud compute images delete lsf-submit-and-worker-rocky-8-image
 ```

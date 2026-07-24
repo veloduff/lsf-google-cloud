@@ -122,17 +122,39 @@ if [ -f "$CONFIG_SRC/lsf.conf" ]; then
     cp -f $CONFIG_SRC/hostProviders.json /opt/lsf/conf/resource_connector/
     cp -f $CONFIG_SRC/googleprov_config.json /opt/lsf/conf/resource_connector/google/conf/
     
-    # Dynamically substitute local project ID from metadata
+    # Dynamically detect project ID, zone, and region from metadata
     PROJECT_ID=$(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/project/project-id)
-    sed -i "s/YOUR_GCP_PROJECT_ID/$PROJECT_ID/g" /opt/lsf/conf/resource_connector/google/conf/googleprov_config.json
+    ZONE_FULL=$(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/zone)
+    ZONE=$(basename "$ZONE_FULL")
+    REGION="${ZONE%-*}"
+
+    # Substitute project ID and zone in lsf.conf
+    sed -i "s#YOUR_GCP_PROJECT_ID#$PROJECT_ID#g" /opt/lsf/conf/lsf.conf
+    sed -i "s#YOUR_GCP_ZONE#$ZONE#g" /opt/lsf/conf/lsf.conf
+    
+    # Substitute project ID and region in googleprov_config.json
+    sed -i "s#YOUR_GCP_PROJECT_ID#$PROJECT_ID#g" /opt/lsf/conf/resource_connector/google/conf/googleprov_config.json
+    sed -i "s#YOUR_GCP_REGION#$REGION#g" /opt/lsf/conf/resource_connector/google/conf/googleprov_config.json
     
     cp -f $CONFIG_SRC/googleprov_templates.json /opt/lsf/conf/resource_connector/google/conf/
     
-    # Dynamically substitute worker image name from VM metadata
-    WORKER_IMAGE=$(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/attributes/worker_image || true)
-    if [ -n "$WORKER_IMAGE" ]; then
-        sed -i "s/YOUR_WORKER_IMAGE_NAME/$WORKER_IMAGE/g" /opt/lsf/conf/resource_connector/google/conf/googleprov_templates.json
+    # Ensure worker image exists in local project for instant bulk VM creation
+    if ! gcloud compute images describe lsf-submit-and-worker-rocky-8-image --project="$PROJECT_ID" &>/dev/null; then
+        echo "Creating base worker image alias lsf-submit-and-worker-rocky-8-image..."
+        gcloud compute images create lsf-submit-and-worker-rocky-8-image \
+          --project="$PROJECT_ID" \
+          --source-image-family=rocky-linux-8-optimized-gcp \
+          --source-image-project=rocky-linux-cloud --quiet || true
     fi
+    WORKER_IMAGE="lsf-submit-and-worker-rocky-8-image"
+    HOST_PROJECT="$PROJECT_ID"
+
+    if [ -n "$WORKER_IMAGE" ]; then
+        sed -i "s#YOUR_WORKER_IMAGE_NAME#$WORKER_IMAGE#g" /opt/lsf/conf/resource_connector/google/conf/googleprov_templates.json
+        sed -i "s#YOUR_HOST_PROJECT#$HOST_PROJECT#g" /opt/lsf/conf/resource_connector/google/conf/googleprov_templates.json
+    fi
+    sed -i "s#YOUR_GCP_REGION#$REGION#g" /opt/lsf/conf/resource_connector/google/conf/googleprov_templates.json
+    sed -i "s#YOUR_GCP_ZONE#$ZONE#g" /opt/lsf/conf/resource_connector/google/conf/googleprov_templates.json
     
     ln -sf /opt/lsf/conf/resource_connector/google/conf /opt/lsf/conf/resource_connector/google/conf/conf
     

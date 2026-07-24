@@ -25,11 +25,20 @@ echo "$local_ip $(hostname)" >> /etc/hosts
 # 4. Export PATH to expose pre-installed Conda and EDA tools
 export PATH="/opt/conda/envs/eda/bin:/opt/conda/bin:$PATH"
 
-# 6. Mount shared LSF and Home directories from Master
+# 6. Mount shared LSF and Home directories from Master with retry loop
 echo "Mounting NFS directories from LSF Master..." >> $logfile
 mkdir -p /opt/lsf
-mount -t nfs 10.10.0.10:/opt/lsf /opt/lsf >> $logfile 2>&1
-mount -t nfs 10.10.0.10:/home /home >> $logfile 2>&1
+systemctl start rpcbind || true
+
+until mount -t nfs -o rw,hard,intr 10.10.0.10:/opt/lsf /opt/lsf >> $logfile 2>&1; do
+    echo "Waiting for NFS /opt/lsf mount from 10.10.0.10..." >> $logfile
+    sleep 3
+done
+
+until mount -t nfs -o rw,hard,intr 10.10.0.10:/home /home >> $logfile 2>&1; do
+    echo "Waiting for NFS /home mount from 10.10.0.10..." >> $logfile
+    sleep 3
+done
 
 # 6.1 Synchronize local user accounts from shared /home
 echo "Syncing user accounts from shared /home..." >> $logfile
