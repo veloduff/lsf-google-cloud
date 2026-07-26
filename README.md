@@ -1,4 +1,4 @@
-# Hybrid LSF EDA Environment: On-Premise to GCP Cloud Bursting
+# Hybrid LSF EDA Environment: On-Premise to GCP Cloud
 
 This repository serves as a blueprint and configuration reference to help customers launch and configure a hybrid Electronic Design Automation (EDA) environment. It demonstrates how an on-premises semiconductor design team can leverage **IBM Spectrum LSF** and the **LSF Resource Connector** to burst EDA workloads into **Google Cloud Platform (GCP)**.
 
