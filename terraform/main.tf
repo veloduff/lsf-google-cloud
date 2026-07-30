@@ -260,6 +260,12 @@ resource "google_storage_bucket" "lsf_install_bucket" {
   location                    = var.bucket_location
   force_destroy               = true
   uniform_bucket_level_access = true
+  public_access_prevention    = "enforced"
+
+  labels = {
+    environment = "lsf-hybrid-cloud"
+    workload    = "eda"
+  }
 }
 
 # Grant the SA access to read the bucket
@@ -325,8 +331,8 @@ resource "google_compute_instance" "lsf_master" {
 
     # Set up NFS exports for shared /opt/lsf and /home
     mkdir -p /opt/lsf
-    echo "/opt/lsf *(rw,sync,no_root_squash,no_all_squash)" >> /etc/exports
-    echo "/home *(rw,sync,no_root_squash,no_all_squash)" >> /etc/exports
+    echo "/opt/lsf 10.10.0.0/16(rw,async,no_root_squash,no_subtree_check) 10.20.0.0/16(rw,async,no_root_squash,no_subtree_check)" >> /etc/exports
+    echo "/home 10.10.0.0/16(rw,async,no_root_squash,no_subtree_check) 10.20.0.0/16(rw,async,no_root_squash,no_subtree_check)" >> /etc/exports
 
     systemctl enable rpcbind nfs-server
     systemctl start rpcbind nfs-server
@@ -338,6 +344,11 @@ resource "google_compute_instance" "lsf_master" {
   EOT
 
   tags = ["lsf-master"]
+
+  labels = {
+    environment = "lsf-hybrid-cloud"
+    workload    = "eda"
+  }
 }
 
 # LSF Submit Host
@@ -394,8 +405,8 @@ resource "google_compute_instance" "lsf_submit" {
 
     # Wait for master NFS to be available, then mount
     mkdir -p /opt/lsf
-    echo "master.onprem.local:/opt/lsf /opt/lsf nfs defaults 0 0" >> /etc/fstab
-    echo "master.onprem.local:/home /home nfs defaults 0 0" >> /etc/fstab
+    echo "master.onprem.local:/opt/lsf /opt/lsf nfs rw,hard,noatime,rsize=1048576,wsize=1048576,timeo=600,retrans=2 0 0" >> /etc/fstab
+    echo "master.onprem.local:/home /home nfs rw,hard,noatime,rsize=1048576,wsize=1048576,timeo=600,retrans=2 0 0" >> /etc/fstab
     
     # Configure local hosts
     echo "10.10.0.10 master.onprem.local master" >> /etc/hosts
@@ -415,6 +426,11 @@ resource "google_compute_instance" "lsf_submit" {
   EOT
 
   depends_on = [google_compute_instance.lsf_master]
+
+  labels = {
+    environment = "lsf-hybrid-cloud"
+    workload    = "eda"
+  }
 }
 
 # ==========================================

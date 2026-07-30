@@ -30,12 +30,12 @@ echo "Mounting NFS directories from LSF Master..." >> $logfile
 mkdir -p /opt/lsf
 systemctl start rpcbind || true
 
-until mount -t nfs -o rw,hard,intr 10.10.0.10:/opt/lsf /opt/lsf >> $logfile 2>&1; do
+until mount -t nfs -o rw,hard,noatime,rsize=1048576,wsize=1048576,timeo=600,retrans=2 10.10.0.10:/opt/lsf /opt/lsf >> $logfile 2>&1; do
     echo "Waiting for NFS /opt/lsf mount from 10.10.0.10..." >> $logfile
     sleep 3
 done
 
-until mount -t nfs -o rw,hard,intr 10.10.0.10:/home /home >> $logfile 2>&1; do
+until mount -t nfs -o rw,hard,noatime,rsize=1048576,wsize=1048576,timeo=600,retrans=2 10.10.0.10:/home /home >> $logfile 2>&1; do
     echo "Waiting for NFS /home mount from 10.10.0.10..." >> $logfile
     sleep 3
 done

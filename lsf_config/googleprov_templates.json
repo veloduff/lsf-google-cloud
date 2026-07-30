@@ -19,6 +19,12 @@
       "vpc": "lsf-cloud-vpc",
       "subnetId": "lsf-cloud-subnet",
       "privateNetworkOnlyFlag": true,
+      "preemptible": true,
+      "labels": {
+        "environment": "lsf-hybrid-cloud",
+        "workload": "eda-simulation",
+        "pricing": "spot"
+      },
       "userData": "rc_account=eda_sim;eda_type=simulation;pricing=spot"
     },
     {
@@ -40,6 +46,11 @@
       "vpc": "lsf-cloud-vpc",
       "subnetId": "lsf-cloud-subnet",
       "privateNetworkOnlyFlag": true,
+      "labels": {
+        "environment": "lsf-hybrid-cloud",
+        "workload": "eda-simulation",
+        "pricing": "ondemand"
+      },
       "userData": "rc_account=eda_sim;eda_type=simulation;pricing=ondemand"
     },
     {
@@ -61,6 +72,12 @@
       "vpc": "lsf-cloud-vpc",
       "subnetId": "lsf-cloud-subnet",
       "privateNetworkOnlyFlag": true,
+      "preemptible": true,
+      "labels": {
+        "environment": "lsf-hybrid-cloud",
+        "workload": "eda-synthesis",
+        "pricing": "spot"
+      },
       "userData": "rc_account=eda_synth;eda_type=synthesis;pricing=spot"
     },
     {
@@ -82,6 +99,11 @@
       "vpc": "lsf-cloud-vpc",
       "subnetId": "lsf-cloud-subnet",
       "privateNetworkOnlyFlag": true,
+      "labels": {
+        "environment": "lsf-hybrid-cloud",
+        "workload": "eda-synthesis",
+        "pricing": "ondemand"
+      },
       "userData": "rc_account=eda_synth;eda_type=synthesis;pricing=ondemand"
     },
     {
@@ -103,6 +125,12 @@
       "vpc": "lsf-cloud-vpc",
       "subnetId": "lsf-cloud-subnet",
       "privateNetworkOnlyFlag": true,
+      "preemptible": true,
+      "labels": {
+        "environment": "lsf-hybrid-cloud",
+        "workload": "eda-sta",
+        "pricing": "spot"
+      },
       "userData": "rc_account=eda_sta;eda_type=sta;pricing=spot"
     },
     {
@@ -124,6 +152,11 @@
       "vpc": "lsf-cloud-vpc",
       "subnetId": "lsf-cloud-subnet",
       "privateNetworkOnlyFlag": true,
+      "labels": {
+        "environment": "lsf-hybrid-cloud",
+        "workload": "eda-sta",
+        "pricing": "ondemand"
+      },
       "userData": "rc_account=eda_sta;eda_type=sta;pricing=ondemand"
     }
   ]
