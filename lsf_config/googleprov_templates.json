@@ -125,6 +125,48 @@
       "subnetId": "lsf-cloud-subnet",
       "privateNetworkOnlyFlag": true,
       "userData": "rc_account=eda_sta;eda_type=sta;pricing=ondemand"
+    },
+    {
+      "templateId": "gcp-c2-standard-8",
+      "maxNumber": 20,
+      "priority": 150,
+      "attributes": {
+        "type": ["String", "X86_64"],
+        "ncores": ["Numeric", "4"],
+        "ncpus": ["Numeric", "4"],
+        "mem": ["Numeric", "32768"],
+        "googlehost": ["Boolean", "1"],
+        "eda_type": ["String", "spillover_8core"]
+      },
+      "imageId": "YOUR_WORKER_IMAGE_NAME",
+      "vmType": "c2-standard-8",
+      "region": "YOUR_GCP_REGION",
+      "zone": "YOUR_GCP_ZONE",
+      "vpc": "lsf-cloud-vpc",
+      "subnetId": "lsf-cloud-subnet",
+      "privateNetworkOnlyFlag": true,
+      "userData": "rc_account=spillover;eda_type=spillover_8core;vm_family=c2"
+    },
+    {
+      "templateId": "gcp-n2-standard-8",
+      "maxNumber": 20,
+      "priority": 140,
+      "attributes": {
+        "type": ["String", "X86_64"],
+        "ncores": ["Numeric", "4"],
+        "ncpus": ["Numeric", "4"],
+        "mem": ["Numeric", "32768"],
+        "googlehost": ["Boolean", "1"],
+        "eda_type": ["String", "spillover_8core"]
+      },
+      "imageId": "YOUR_WORKER_IMAGE_NAME",
+      "vmType": "n2-standard-8",
+      "region": "YOUR_GCP_REGION",
+      "zone": "YOUR_GCP_ZONE",
+      "vpc": "lsf-cloud-vpc",
+      "subnetId": "lsf-cloud-subnet",
+      "privateNetworkOnlyFlag": true,
+      "userData": "rc_account=spillover;eda_type=spillover_8core;vm_family=n2"
     }
   ]
 }
