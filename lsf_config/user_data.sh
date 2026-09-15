@@ -27,6 +27,8 @@ export PATH="/opt/conda/envs/eda/bin:/opt/conda/bin:$PATH"
 
 # 6. Mount shared LSF and Home directories from Master with retry loop
 echo "Mounting NFS directories from LSF Master..." >> $logfile
+which mount.nfs &>/dev/null || (dnf install -y nfs-utils || yum install -y nfs-utils) >> $logfile 2>&1
+rpm -q libnsl &>/dev/null || (dnf install -y libnsl || yum install -y libnsl) >> $logfile 2>&1
 mkdir -p /opt/lsf
 systemctl start rpcbind || true
 

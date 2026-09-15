@@ -459,5 +459,16 @@ resource "google_dns_managed_zone" "cloud_reverse_dns_peering" {
   }
 }
 
+# ==========================================
+# ORGANIZATION POLICIES
+# ==========================================
 
+# Disable compute.requireShieldedVm so LSF Resource Connector can create dynamic worker VMs
+resource "google_project_organization_policy" "disable_require_shielded_vm" {
+  project    = var.project_id
+  constraint = "constraints/compute.requireShieldedVm"
 
+  boolean_policy {
+    enforced = false
+  }
+}

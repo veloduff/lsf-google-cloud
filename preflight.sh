@@ -67,7 +67,7 @@ if [ -n "$PROJECT_ID" ] && [ "$PROJECT_ID" != "(unset)" ]; then
     echo "PASSED"
 
     echo "4. Verifying required GCP APIs (compute, iam, storage)..."
-    REQUIRED_APIS=("compute.googleapis.com" "iam.googleapis.com" "storage.googleapis.com" "iamcredentials.googleapis.com")
+    REQUIRED_APIS=("compute.googleapis.com" "iam.googleapis.com" "storage.googleapis.com" "iamcredentials.googleapis.com" "dns.googleapis.com")
     ENABLED_APIS=$(gcloud services list --project="$PROJECT_ID" --enabled --format="value(config.name)")
     for api in "${REQUIRED_APIS[@]}"; do
         if ! echo "$ENABLED_APIS" | grep -q "$api"; then
@@ -80,13 +80,27 @@ if [ -n "$PROJECT_ID" ] && [ "$PROJECT_ID" != "(unset)" ]; then
             echo "   -> API enabled: $api"
         fi
     done
+
+    echo "5. Verifying Organization Policies (compute.requireShieldedVm)..."
+    # IBM Spectrum LSF Resource Connector creates dynamic worker VMs via bulkInsert without
+    # shielded_instance_config. Ensure the compute.requireShieldedVm constraint is not enforced on the project.
+    if gcloud resource-manager org-policies describe compute.requireShieldedVm --project="$PROJECT_ID" --effective 2>/dev/null | grep -q "enforced: true"; then
+        echo "   -> Disabling compute.requireShieldedVm constraint on project $PROJECT_ID..."
+        gcloud resource-manager org-policies disable-enforce compute.requireShieldedVm --project="$PROJECT_ID" || {
+            echo "WARNING: Failed to disable compute.requireShieldedVm on project $PROJECT_ID."
+            echo "         Please ensure your GCP account has the 'roles/orgpolicy.policyAdmin' role."
+        }
+    else
+        echo "   -> compute.requireShieldedVm is not enforced (OK for dynamic LSF workers)."
+    fi
 else
     echo "3. NOTE: No GCP Project ID provided as argument or in terraform.tfvars. Skipping API validation."
     echo "   Usage: ./preflight.sh <YOUR_GCP_PROJECT_ID>"
 fi
 
-# 4. Check for Customer-Supplied LSF Installer Archives in Install_Files/ (Optional if using Golden Images)
-echo -n "5. Checking for customer-supplied LSF installer archives in Install_Files/... "
+
+# 6. Check for Customer-Supplied LSF Installer Archives in Install_Files/ (Optional if using Golden Images)
+echo -n "6. Checking for customer-supplied LSF installer archives in Install_Files/... "
 INSTALL_DIR="Install_Files"
 REQUIRED_FILES=(
     "lsf_std_entitlement.dat"
