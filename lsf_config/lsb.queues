@@ -35,6 +35,6 @@ RC_HOSTS         = googlehost
 RC_DEMAND_POLICY = THRESHOLD[[1, 0]]
 # Direct jobs strictly to the c2-standard-8 and n2-standard-8 spillover templates
 RES_REQ          = select[googlehost && (eda_type == spillover_8core)]
-DESCRIPTION      = 8-core spillover queue: bursts to c2-standard-8 first, spilling over to n2-standard-8.
+DESCRIPTION      = Spillover queue: bursts to h4d-standard-192 first, spilling over to c2-standard-8, then n2-standard-8.
 End Queue
 

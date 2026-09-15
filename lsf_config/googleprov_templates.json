@@ -127,6 +127,27 @@
       "userData": "rc_account=eda_sta;eda_type=sta;pricing=ondemand"
     },
     {
+      "templateId": "gcp-h4d-standard-192",
+      "maxNumber": 5,
+      "priority": 200,
+      "attributes": {
+        "type": ["String", "X86_64"],
+        "ncores": ["Numeric", "96"],
+        "ncpus": ["Numeric", "96"],
+        "mem": ["Numeric", "737280"],
+        "googlehost": ["Boolean", "1"],
+        "eda_type": ["String", "spillover_8core"]
+      },
+      "imageId": "YOUR_WORKER_IMAGE_NAME",
+      "vmType": "h4d-standard-192",
+      "region": "YOUR_GCP_REGION",
+      "zone": "YOUR_GCP_ZONE",
+      "vpc": "lsf-cloud-vpc",
+      "subnetId": "lsf-cloud-subnet",
+      "privateNetworkOnlyFlag": true,
+      "userData": "rc_account=spillover;eda_type=spillover_8core;vm_family=h4d"
+    },
+    {
       "templateId": "gcp-c2-standard-8",
       "maxNumber": 20,
       "priority": 150,
