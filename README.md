@@ -122,12 +122,13 @@ When you deploy this environment, the Terraform configurations and LSF setup scr
 
 ### 3. Environment Blueprint
 
-To set up and validate this environment, the repository provides two core functional testing suites and supporting infrastructure:
-1. **Terraform Infrastructure** ([terraform/](terraform)): Automates VPCs, Subnets, VPC Peering, Cloud NAT, Cloud DNS Peering, IAM Service Accounts, GCS Buckets, and simulated On-Premises LSF Master and Submit VMs.
+To set up and validate this environment, the repository provides three core functional testing suites and supporting infrastructure:
+1. **Terraform Infrastructure** ([terraform/](terraform)): Automates VPCs, Subnets, VPC Peering, Cloud NAT, Cloud DNS Peering, IAM Service Accounts, GCS Buckets, Instance Templates, and simulated On-Premises LSF Master and Submit VMs.
 2. **LSF Configurations** ([lsf_config/](lsf_config)): Configurations for the LSF cluster, including Resource Connector templates customized for dynamic GCP cloud bursting.
 3. **Component 1: Cloud Auto-Scaling Suite** ([submit_scripts/](submit_scripts)): Contains job submission scripts and real-time monitoring tools designed to test concurrent dynamic scaling limits (such as launching 10 instances / 20 slots simultaneously and watching them terminate when idle).
 4. **Component 2: Parallel EDA Workloads & Regressions** ([eda_workflow/](eda_workflow)): A sample semiconductor digital design project (Verilog counter, self-checking testbench, Yosys synthesis, and 100-task parallel regression sweep) to verify real hardware design tools across the cluster.
-5. **Golden Image Guide** ([GOLDEN_IMAGE.md](GOLDEN_IMAGE.md)): Complete instructions and automation scripts to build the custom GCE worker image pre-loaded with open-source EDA toolchains.
+5. **Component 3: Cross-Family Dynamic Spillover Suite**: Demonstrates priority-based multi-family cloud bursting (attempting high-performance H4D full-node shapes first, then automatically spilling over to C2 and N2 instances upon zone capacity exhaustion).
+6. **Golden Image Guide** ([GOLDEN_IMAGE.md](GOLDEN_IMAGE.md)): Complete instructions and automation scripts to build the custom GCE worker image pre-loaded with open-source EDA toolchains.
 
 ---
 
@@ -151,7 +152,10 @@ To set up and validate this environment, the repository provides two core functi
    bucket_name     = "your-custom-gcs-bucket-name" # Optional
    bucket_location = "US"                        # Optional
    ```
-   *(Alternatively, you can export environment variables such as `export TF_VAR_project_id="your-gcp-project-id"`, `export TF_VAR_region="your-region"`, `export TF_VAR_bucket_name="your-bucket"`).*
+3. **Export your environment variables**: Run `source ./set_env.sh` to populate active shell variables (including GCP authentication tokens for Terraform):
+   ```bash
+   source ./set_env.sh
+   ```
 
 ### Step 4.0b: Run Pre-Flight Checks
 Next, run our automated pre-flight check script to verify that your CLI tools, active authentication sessions (CLI & ADC), project APIs, and LSF installer archives are ready (it automatically reads from `terraform/terraform.tfvars`):
@@ -421,6 +425,49 @@ Run an industry-standard multi-seed regression suite using an LSF Job Array (`-J
 *   Each task executes `run_regression_task.sh`, reading `$LSB_JOBINDEX` to generate a unique random test seed.
 *   Outputs for each task are isolated in separate sandboxes (`runs/run_1/` through `runs/run_100/`), preventing file collisions on the shared NFS storage.
 *   Monitor array progress using `bjobs` or `bjobs -A`.
+
+---
+
+### Component 3: Cross-Family Dynamic Spillover (`c2_n2_spillover` Queue)
+
+This demonstration highlights priority-based cloud bursting across heterogeneous GCP machine families. If the primary, highest-priority machine type is fully booked or stocked out in the zone, LSF Resource Connector automatically and transparently spills over to secondary and tertiary machine types without manual intervention or job failure.
+
+#### 1. Spillover Priority Hierarchy
+The `c2_n2_spillover` queue (`lsf_config/lsb.queues`) selects hosts with `eda_type == spillover_8core`. The LSF Resource Connector templates (`lsf_config/googleprov_templates.json`) define three fallback tiers:
+
+| Tier | Template ID | Machine Type | Boot Disk Type | Priority | Description |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **1st (Primary)** | `gcp-h4d-standard-192` | `h4d-standard-192` | `hyperdisk-balanced` | **200** | Full-node HPC shape via Instance Template (`lsf-h4d-worker-template`) |
+| **2nd (Spillover)** | `gcp-c2-standard-8` | `c2-standard-8` | `pd-standard` | **150** | Compute-optimized C2 worker |
+| **3rd (Fallback)** | `gcp-n2-standard-8` | `n2-standard-8` | `pd-standard` | **140** | General-purpose N2 worker |
+
+> [!NOTE]
+> The H4D shape requires Google Cloud's `hyperdisk-balanced` boot disk and an `on_host_maintenance = "TERMINATE"` policy. These requirements are encapsulated cleanly in Terraform via `google_compute_instance_template.h4d_worker_template` and referenced by LSF using `"launchTemplateId": "lsf-h4d-worker-template"`.
+
+#### 2. Submit a Spillover Workload
+From the Submit VM (`./ssh_submit.sh`), submit a batch job to the spillover queue:
+```bash
+bsub -q c2_n2_spillover sleep 600
+```
+
+#### 3. Observe Automatic Cloud Spillover
+Watch LSF evaluate templates in priority order:
+1. **Initial Allocation Attempt**: LSF triggers dynamic provisioning for the primary tier (`gcp-h4d-standard-192`, priority 200).
+2. **Stockout Handling**: Because H4D instances frequently stock out (`ZONE_RESOURCE_POOL_EXHAUSTED`), GCP returns a capacity error (`503 SERVICE UNAVAILABLE`). LSF marks the H4D template temporarily exhausted.
+3. **Automatic Spillover**: LSF immediately shifts demand to the next available tier (`gcp-c2-standard-8`, priority 150) or fallback (`gcp-n2-standard-8`, priority 140), provisioning the alternative VM to satisfy the pending job.
+
+#### 4. Verification & Live Monitoring
+Monitor queue demand and instance provisioning:
+```bash
+# Check job status and queue demand
+bjobs -p
+
+# Check dynamic cloud instances being requested/created
+bhosts -rc
+
+# (On Master VM) View real-time provider decision logs:
+tail -f /opt/lsf/log/google-provider.log.master.onprem.local
+```
 
 ---
 

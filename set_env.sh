@@ -20,6 +20,9 @@ if [ -n "$bucket" ]; then
     export TF_VAR_bucket_name="$bucket"
 fi
 
+# Ensure Google OAuth Access Token is exported for Terraform in corporate/cloudtop shells
+export GOOGLE_OAUTH_ACCESS_TOKEN=$(gcloud auth print-access-token 2>/dev/null || true)
+
 echo "Exported Terraform variables into shell session:"
 echo "  TF_VAR_project_id = ${TF_VAR_project_id}"
 echo "  TF_VAR_region     = ${TF_VAR_region}"
@@ -27,3 +30,7 @@ echo "  TF_VAR_zone       = ${TF_VAR_zone}"
 if [ -n "${TF_VAR_bucket_name:-}" ]; then
     echo "  TF_VAR_bucket_name = ${TF_VAR_bucket_name}"
 fi
+if [ -n "${GOOGLE_OAUTH_ACCESS_TOKEN:-}" ]; then
+    echo "  GOOGLE_OAUTH_ACCESS_TOKEN = (set)"
+fi
+

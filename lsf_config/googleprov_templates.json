@@ -138,13 +138,9 @@
         "googlehost": ["Boolean", "1"],
         "eda_type": ["String", "spillover_8core"]
       },
-      "imageId": "YOUR_WORKER_IMAGE_NAME",
-      "vmType": "h4d-standard-192",
+      "launchTemplateId": "lsf-h4d-worker-template",
       "region": "YOUR_GCP_REGION",
       "zone": "YOUR_GCP_ZONE",
-      "vpc": "lsf-cloud-vpc",
-      "subnetId": "lsf-cloud-subnet",
-      "privateNetworkOnlyFlag": true,
       "userData": "rc_account=spillover;eda_type=spillover_8core;vm_family=h4d"
     },
     {

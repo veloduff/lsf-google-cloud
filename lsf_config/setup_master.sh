@@ -156,6 +156,23 @@ if [ -f "$CONFIG_SRC/lsf.conf" ]; then
     sed -i "s#YOUR_GCP_REGION#$REGION#g" /opt/lsf/conf/resource_connector/google/conf/googleprov_templates.json
     sed -i "s#YOUR_GCP_ZONE#$ZONE#g" /opt/lsf/conf/resource_connector/google/conf/googleprov_templates.json
     
+    # Ensure H4D launch template exists with hyperdisk-balanced boot disk and TERMINATE maintenance policy
+    if ! gcloud compute instance-templates describe lsf-h4d-worker-template --project="$PROJECT_ID" &>/dev/null; then
+        echo "Creating global instance template lsf-h4d-worker-template with hyperdisk-balanced boot disk..."
+        gcloud compute instance-templates create lsf-h4d-worker-template \
+          --project="$PROJECT_ID" \
+          --machine-type=h4d-standard-192 \
+          --image="$WORKER_IMAGE" \
+          --boot-disk-type=hyperdisk-balanced \
+          --boot-disk-size=50GB \
+          --maintenance-policy=TERMINATE \
+          --network=lsf-cloud-vpc \
+          --subnet=lsf-cloud-subnet \
+          --service-account="lsf-resource-connector-sa@${PROJECT_ID}.iam.gserviceaccount.com" \
+          --scopes=cloud-platform \
+          --tags=lsf-worker --quiet || true
+    fi
+
     ln -sf /opt/lsf/conf/resource_connector/google/conf /opt/lsf/conf/resource_connector/google/conf/conf
     
     # Copy user_data.sh script for cloud workers

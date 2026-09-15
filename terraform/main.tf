@@ -472,3 +472,42 @@ resource "google_project_organization_policy" "disable_require_shielded_vm" {
     enforced = false
   }
 }
+
+# ==========================================
+# INSTANCE TEMPLATES (Dynamic Worker Templates)
+# ==========================================
+
+# Global Instance Template for specialized H4D dynamic cloud workers (requires hyperdisk-balanced & TERMINATE maintenance)
+resource "google_compute_instance_template" "h4d_worker_template" {
+  name         = "lsf-h4d-worker-template"
+  machine_type = "h4d-standard-192"
+
+  disk {
+    source_image = var.worker_image
+    auto_delete  = true
+    boot         = true
+    disk_type    = "hyperdisk-balanced"
+    disk_size_gb = 50
+  }
+
+  scheduling {
+    on_host_maintenance = "TERMINATE"
+    automatic_restart   = true
+  }
+
+  network_interface {
+    subnetwork = google_compute_subnetwork.cloud_subnet.id
+  }
+
+  service_account {
+    email  = google_service_account.lsf_rc_sa.email
+    scopes = ["cloud-platform"]
+  }
+
+  tags = ["lsf-worker"]
+
+  lifecycle {
+    create_before_destroy = false
+  }
+}
+
