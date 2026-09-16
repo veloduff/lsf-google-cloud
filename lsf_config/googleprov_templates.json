@@ -132,8 +132,8 @@
       "priority": 200,
       "attributes": {
         "type": ["String", "X86_64"],
-        "ncores": ["Numeric", "96"],
-        "ncpus": ["Numeric", "96"],
+        "ncores": ["Numeric", "192"],
+        "ncpus": ["Numeric", "192"],
         "mem": ["Numeric", "737280"],
         "googlehost": ["Boolean", "1"],
         "eda_type": ["String", "spillover_8core"]
