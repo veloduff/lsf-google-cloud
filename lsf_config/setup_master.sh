@@ -175,10 +175,15 @@ if [ -f "$CONFIG_SRC/lsf.conf" ]; then
 
     ln -sf /opt/lsf/conf/resource_connector/google/conf /opt/lsf/conf/resource_connector/google/conf/conf
     
-    # Copy user_data.sh script for cloud workers
+    # Copy user_data.sh and getRequestStatus.sh scripts for cloud workers and connector
     mkdir -p /opt/lsf/10.1/resource_connector/google/scripts
     cp -f $CONFIG_SRC/user_data.sh /opt/lsf/10.1/resource_connector/google/scripts/
     chmod +x /opt/lsf/10.1/resource_connector/google/scripts/user_data.sh
+    if [ -f "$CONFIG_SRC/getRequestStatus.sh" ]; then
+        cp -f $CONFIG_SRC/getRequestStatus.sh /opt/lsf/10.1/resource_connector/google/scripts/
+        chmod +x /opt/lsf/10.1/resource_connector/google/scripts/getRequestStatus.sh
+        chown lsfadmin:lsf /opt/lsf/10.1/resource_connector/google/scripts/getRequestStatus.sh
+    fi
 fi
 
 # 6b. Copy EDA workflows & Scaling scripts from GCS to shared NFS directory (/home/lsfadmin)
