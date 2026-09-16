@@ -24,7 +24,7 @@ DESCRIPTION  = High-throughput queue for EDA workloads bursting to GCP.
 End Queue
 
 Begin Queue
-QUEUE_NAME       = c2_n2_spillover
+QUEUE_NAME       = spillover
 PRIORITY         = 30
 USERS            = all
 # Allow running on both local master (for testing) and dynamic GCP hosts

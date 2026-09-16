@@ -428,12 +428,12 @@ Run an industry-standard multi-seed regression suite using an LSF Job Array (`-J
 
 ---
 
-### Component 3: Cross-Family Dynamic Spillover (`c2_n2_spillover` Queue)
+### Component 3: Cross-Family Dynamic Spillover (`spillover` Queue)
 
 This demonstration highlights priority-based cloud bursting across heterogeneous GCP machine families. If the primary, highest-priority machine type is fully booked or stocked out in the zone, LSF Resource Connector automatically and transparently spills over to secondary and tertiary machine types without manual intervention or job failure.
 
 #### 1. Spillover Priority Hierarchy
-The `c2_n2_spillover` queue (`lsf_config/lsb.queues`) selects hosts with `eda_type == spillover_8core`. The LSF Resource Connector templates (`lsf_config/googleprov_templates.json`) define three fallback tiers:
+The `spillover` queue (`lsf_config/lsb.queues`) selects hosts with `eda_type == spillover_8core`. The LSF Resource Connector templates (`lsf_config/googleprov_templates.json`) define three fallback tiers:
 
 | Tier | Template ID | Machine Type | Boot Disk Type | Priority | Description |
 | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -447,7 +447,7 @@ The `c2_n2_spillover` queue (`lsf_config/lsb.queues`) selects hosts with `eda_ty
 #### 2. Submit a Spillover Workload
 From the Submit VM (`./ssh_submit.sh`), submit a batch job to the spillover queue:
 ```bash
-bsub -q c2_n2_spillover sleep 600
+bsub -q spillover sleep 600
 ```
 
 #### 3. Observe Automatic Cloud Spillover
