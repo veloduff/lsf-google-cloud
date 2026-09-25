@@ -40,7 +40,7 @@ From your local workspace, run the script. It automatically auto-detects your Pr
 
 ## Persisting and Sharing Images Across Projects
 
-If the current GCP project is temporary and will be deleted, you must copy the custom images to a persistent project (e.g., `persistent-project-shared-data`) to prevent them from being lost.
+If the current GCP project is temporary and will be deleted, you must copy the custom images to a persistent project (e.g., `your-shared-image-project-id`) to prevent them from being lost.
 
 Because corporate GCP environments often enable organization policies restricting direct image copies (`constraints/compute.trustedImageProjects`), you can use GCE snapshots to easily migrate images without violating constraints.
 
@@ -56,26 +56,26 @@ Run these commands in your terminal to safely replicate the image:
 # A. Create a temporary disk in the source project from the image
 gcloud compute disks create temp-worker-disk \
     --image="lsf-submit-and-worker-rocky-8-image" \
-    --project="lsf-testing-001" \
+    --project="your-source-project-id" \
     --zone="${TF_VAR_zone:-us-central1-a}"
 
 # B. Create a snapshot from that disk
 gcloud compute snapshots create worker-snapshot \
     --source-disk="temp-worker-disk" \
     --source-disk-zone="${TF_VAR_zone:-us-central1-a}" \
-    --project="lsf-testing-001"
+    --project="your-source-project-id"
 
 # C. Create a disk in your persistent target project from the snapshot
 gcloud compute disks create temp-worker-disk-dest \
-    --source-snapshot="projects/lsf-testing-001/global/snapshots/worker-snapshot" \
-    --project="persistent-project-shared-data" \
+    --source-snapshot="projects/your-source-project-id/global/snapshots/worker-snapshot" \
+    --project="your-shared-image-project-id" \
     --zone="${TF_VAR_zone:-us-central1-a}"
 
 # D. Register the final Golden Image in your persistent project
 gcloud compute images create lsf-submit-and-worker-rocky-8-image \
     --source-disk="temp-worker-disk-dest" \
     --source-disk-zone="${TF_VAR_zone:-us-central1-a}" \
-    --project="persistent-project-shared-data" \
+    --project="your-shared-image-project-id" \
     --family="lsf-rocky-8"
 ```
 
@@ -87,26 +87,26 @@ gcloud compute images create lsf-submit-and-worker-rocky-8-image \
 # A. Create a temporary disk in the source project from the master image
 gcloud compute disks create temp-master-disk \
     --image="lsf-master-rocky-8-image" \
-    --project="lsf-testing-001" \
+    --project="your-source-project-id" \
     --zone="${TF_VAR_zone:-us-central1-a}"
 
 # B. Create a snapshot from that disk
 gcloud compute snapshots create master-snapshot \
     --source-disk="temp-master-disk" \
     --source-disk-zone="${TF_VAR_zone:-us-central1-a}" \
-    --project="lsf-testing-001"
+    --project="your-source-project-id"
 
 # C. Create a disk in your persistent target project from the snapshot
 gcloud compute disks create temp-master-disk-dest \
-    --source-snapshot="projects/lsf-testing-001/global/snapshots/master-snapshot" \
-    --project="persistent-project-shared-data" \
+    --source-snapshot="projects/your-source-project-id/global/snapshots/master-snapshot" \
+    --project="your-shared-image-project-id" \
     --zone="${TF_VAR_zone:-us-central1-a}"
 
 # D. Register the final Master Image in your persistent project
 gcloud compute images create lsf-master-rocky-8-image \
     --source-disk="temp-master-disk-dest" \
     --source-disk-zone="${TF_VAR_zone:-us-central1-a}" \
-    --project="persistent-project-shared-data" \
+    --project="your-shared-image-project-id" \
     --family="lsf-rocky-8"
 ```
 
@@ -114,19 +114,19 @@ gcloud compute images create lsf-master-rocky-8-image \
 After both worker/submit and master images have been successfully registered in the persistent project, clean up the temporary disks and snapshots from both projects to avoid extra storage charges:
 
 ```bash
-# --- Clean Up Source Project (lsf-testing-001) ---
+# --- Clean Up Source Project (your-source-project-id) ---
 gcloud compute disks delete temp-worker-disk temp-master-disk \
-    --project="lsf-testing-001" \
+    --project="your-source-project-id" \
     --zone="${TF_VAR_zone:-us-central1-a}" \
     --quiet
 
 gcloud compute snapshots delete worker-snapshot master-snapshot \
-    --project="lsf-testing-001" \
+    --project="your-source-project-id" \
     --quiet
 
-# --- Clean Up Destination Project (persistent-project-shared-data) ---
+# --- Clean Up Destination Project (your-shared-image-project-id) ---
 gcloud compute disks delete temp-worker-disk-dest temp-master-disk-dest \
-    --project="persistent-project-shared-data" \
+    --project="your-shared-image-project-id" \
     --zone="${TF_VAR_zone:-us-central1-a}" \
     --quiet
 ```
@@ -135,12 +135,12 @@ gcloud compute disks delete temp-worker-disk-dest temp-master-disk-dest \
 
 ## Using the Shared Images in Other Projects
 
-Once the images are hosted in your persistent project (`persistent-project-shared-data`), you can reference them directly from other projects:
+Once the images are hosted in your persistent project (`your-shared-image-project-id`), you can reference them directly from other projects:
 
 ### 1. Grant IAM Permissions (One-Time Setup)
 Grant the target project's Compute Engine service account read permissions on the persistent image project:
 ```bash
-gcloud projects add-iam-policy-binding persistent-project-shared-data \
+gcloud projects add-iam-policy-binding your-shared-image-project-id \
     --member="serviceAccount:TARGET_PROJECT_NUMBER-compute@developer.gserviceaccount.com" \
     --role="roles/compute.imageUser"
 ```
@@ -151,16 +151,14 @@ Use the full resource URLs to instantiate VMs in your new projects:
 
 * **LSF Dynamic Workers & Submit VM**:
   * **In Terraform**:
-    `image = "projects/persistent-project-shared-data/global/images/lsf-submit-and-worker-rocky-8-image"`
+    `image = "projects/your-shared-image-project-id/global/images/lsf-submit-and-worker-rocky-8-image"`
   * **In `googleprov_templates.json`**:
-    `"imageId": "projects/persistent-project-shared-data/global/images/lsf-submit-and-worker-rocky-8-image"`
+    `"imageId": "projects/your-shared-image-project-id/global/images/lsf-submit-and-worker-rocky-8-image"`
   * **In `gcloud` VM Creation**:
-    `--image="projects/persistent-project-shared-data/global/images/lsf-submit-and-worker-rocky-8-image"`
+    `--image="projects/your-shared-image-project-id/global/images/lsf-submit-and-worker-rocky-8-image"`
 
 * **LSF Master VM**:
   * **In Terraform**:
-    `image = "projects/persistent-project-shared-data/global/images/lsf-master-rocky-8-image"`
+    `image = "projects/your-shared-image-project-id/global/images/lsf-master-rocky-8-image"`
   * **In `gcloud` VM Creation**:
-    `--image="projects/persistent-project-shared-data/global/images/lsf-master-rocky-8-image"`
-
-
+    `--image="projects/your-shared-image-project-id/global/images/lsf-master-rocky-8-image"`

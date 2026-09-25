@@ -191,6 +191,17 @@ You are ready to deploy: cd terraform && terraform apply
    ```
    *This automatically provisions the VPC networks, Cloud NAT, GCS Bucket, and launches the initial Master and Submit VMs using standard public Rocky Linux 8 base images.*
 
+> [!NOTE]
+> **SSH Firewall Lockdown (Identity-Aware Proxy vs. Initial Testing)**
+> By default, the SSH firewall rules (`onprem-allow-ssh` and `cloud-allow-ssh` in [`terraform/main.tf`](terraform/main.tf)) are locked down to Google Cloud's **Identity-Aware Proxy (IAP)** TCP forwarding range (`35.235.240.0/20`) via the `ssh_source_ranges` variable.
+>
+> If you need to open SSH access to `0.0.0.0/0` for initial testing or custom networking setups, you can override this in either of two ways:
+> 1. **Via `terraform/terraform.tfvars` (Recommended)**: Add the following line to `terraform/terraform.tfvars` before running `terraform apply`:
+>    ```hcl
+>    ssh_source_ranges = ["0.0.0.0/0"]
+>    ```
+> 2. **Directly in [`terraform/main.tf`](terraform/main.tf)**: Update `source_ranges` in the `onprem_allow_ssh` and `cloud_allow_ssh` firewall resources to `["0.0.0.0/0"]`.
+
 ### Step 4.1b: Using Existing VPCs (Optional)
 By default, the provided Terraform scripts automatically **create two new VPCs from scratch** (`lsf-onprem-vpc` and `lsf-cloud-vpc`) and peer them together. If you prefer to deploy into **existing VPC networks**, make the following 3 adjustments before running:
 1. **In LSF Resource Connector Templates ([`lsf_config/googleprov_templates.json`](lsf_config/googleprov_templates.json))**:

@@ -147,7 +147,10 @@ resource "google_compute_firewall" "onprem_allow_ssh" {
     ports    = ["22"]
   }
 
-  source_ranges = ["0.0.0.0/0"]
+  # Locked down by default to Google Cloud IAP TCP forwarding CIDR (["35.235.240.0/20"]).
+  # For initial testing, set ssh_source_ranges = ["0.0.0.0/0"] in terraform.tfvars
+  # or replace var.ssh_source_ranges with ["0.0.0.0/0"] below.
+  source_ranges = var.ssh_source_ranges
 }
 
 resource "google_compute_firewall" "onprem_allow_cloud" {
@@ -199,7 +202,10 @@ resource "google_compute_firewall" "cloud_allow_ssh" {
     ports    = ["22"]
   }
 
-  source_ranges = ["0.0.0.0/0"]
+  # Locked down by default to Google Cloud IAP TCP forwarding CIDR (["35.235.240.0/20"]).
+  # For initial testing, set ssh_source_ranges = ["0.0.0.0/0"] in terraform.tfvars
+  # or replace var.ssh_source_ranges with ["0.0.0.0/0"] below.
+  source_ranges = var.ssh_source_ranges
 }
 
 resource "google_compute_firewall" "cloud_allow_onprem" {

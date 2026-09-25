@@ -13,3 +13,7 @@ zone            = "us-central1-a"
 
 # Optional: GCS Location (defaults to US)
 # bucket_location = "US"
+
+# Optional: Allowed SSH source CIDR ranges (defaults to IAP range ["35.235.240.0/20"])
+# For initial testing from any IP, uncomment the line below:
+# ssh_source_ranges = ["0.0.0.0/0"]

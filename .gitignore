@@ -606,6 +606,4 @@ ansible/inventory.ini
 cluster.conf
 
 Install_Files
-
-
-
+.agents/

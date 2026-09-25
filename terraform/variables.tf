@@ -69,3 +69,9 @@ variable "bucket_location" {
   default     = "US"
 }
 
+variable "ssh_source_ranges" {
+  description = "Source IP CIDR ranges allowed for SSH access (port 22). Defaults to Google Cloud IAP TCP forwarding range (35.235.240.0/20). Change to [\"0.0.0.0/0\"] for open initial testing."
+  type        = list(string)
+  default     = ["35.235.240.0/20"]
+}
+
