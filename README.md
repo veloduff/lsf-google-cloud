@@ -498,6 +498,10 @@ This repository includes a complete, self-contained **Google Cloud Skills Boost 
 *   **Automated Activity Tracking Assessments**: [`qwiklabs/assessments/`](qwiklabs/assessments)
 *   **Instructor & Authoring Guide**: [`qwiklabs/README.md`](qwiklabs/README.md)
 
-## License
+## License & Disclaimers
 
 Apache License 2.0. See [`LICENSE`](LICENSE) for details.
+
+This open source solution is intended to enhance the Google customer experience. For product support, please see [support.google.com](https://support.google.com/).
+
+Eligibility for the [Google Open Source Software Vulnerability Rewards Program](https://bughunters.google.com/open-source-security) is determined by the [Google Open Source Software Vulnerability Reward Program Rules](https://bughunters.google.com/about/rules/open-source/google-open-source-software-vulnerability-reward-program-rules).
