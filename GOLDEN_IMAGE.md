@@ -20,17 +20,17 @@ Sharing the LSF core configuration and binaries via NFS `/opt/lsf` keeps the ima
 
 ## Automated Golden Image Creation Process
 
-An automated script `lsf_config/build_golden_image.sh` is provided in the repository to spin up a temporary VM, execute the installations, capture the disk image, and clean up GCE resources.
+An automated script [`lsf_config/build_golden_image.sh`](lsf_config/build_golden_image.sh) is provided in the repository to spin up a temporary `n2-standard-4` VM, execute the installations, capture the disk image, and clean up GCE resources.
 
 ### Running the Build Script
 From your local workspace, run the script. It automatically auto-detects your Project ID, Region, Zone, and Subnet from `terraform/terraform.tfvars` or `gcloud config`:
 ```bash
 ./lsf_config/build_golden_image.sh
 ```
-*(You can also override parameters explicitly via CLI flags: `./lsf_config/build_golden_image.sh --project=YOUR_PROJECT --region=YOUR_REGION --zone=YOUR_ZONE`)*
+*(You can also override parameters explicitly via CLI flags: `./lsf_config/build_golden_image.sh --project=YOUR_PROJECT --region=YOUR_REGION --zone=YOUR_ZONE --machine-type=n2-standard-4`)*
 
 ### Script Workflow
-1. **Launches Temporary VM**: Creates a temporary instance `lsf-golden-build` in GCE.
+1. **Launches Temporary VM**: Creates a temporary instance `lsf-golden-build` (`n2-standard-4`) in GCE.
 2. **Executes Provisioning Tasks**: Runs remote commands via SSH to install the dependencies and EDA packages.
 3. **Stops VM & Deletes Old Image**: Stops the VM and removes the previous `lsf-submit-and-worker-rocky-8-image` registration.
 4. **Captures Disk Image**: Creates a fresh `lsf-submit-and-worker-rocky-8-image` custom image from the stopped VM's boot disk.

@@ -1,0 +1,84 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: CI Validation
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  terraform-validate:
+    name: Terraform Format & Validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.6.x"
+
+      - name: Check Terraform formatting
+        run: terraform fmt -check -recursive
+
+      - name: Validate root Terraform module
+        working-directory: terraform
+        run: |
+          terraform init -backend=false
+          terraform validate
+
+      - name: Validate Qwiklabs startup Terraform module
+        working-directory: qwiklabs/tf
+        run: |
+          terraform init -backend=false
+          terraform validate
+
+  lint-scripts-and-configs:
+    name: ShellCheck & JSON Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run ShellCheck on all shell scripts
+        run: |
+          shellcheck -x \
+            preflight.sh \
+            set_env.sh \
+            ssh_master.sh \
+            ssh_submit.sh \
+            upload_assets.sh \
+            lsf_config/build_golden_image.sh \
+            lsf_config/setup_master.sh \
+            eda_workflow/run_eda_job.sh \
+            eda_workflow/run_regression_task.sh \
+            eda_workflow/submit_eda_job.sh \
+            eda_workflow/submit_regression.sh \
+            submit_scripts/monitor_scaling.sh \
+            submit_scripts/scale_10_job.sh \
+            submit_scripts/submit_scale_10.sh \
+            qwiklabs/assessments/*.sh
+
+      - name: Validate LSF Resource Connector JSON files
+        run: |
+          jq empty lsf_config/googleprov_config.json
+          jq empty lsf_config/googleprov_templates.json
+          jq empty lsf_config/hostProviders.json

@@ -1,4 +1,18 @@
 #!/bin/bash
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 # =====================================================================
 # Automated LSF Master Installation & Configuration Script (setup_master.sh)
 # =====================================================================
@@ -7,7 +21,6 @@ set -e
 # Capture the absolute path to the directory containing this script before any directory changes
 CONFIG_SRC=$(cd "$(dirname "$0")" && pwd)
 echo "Resolved CONFIG_SRC to: $CONFIG_SRC"
-
 
 echo "=================================================="
 echo "Starting LSF Master Setup on: $(hostname)"
@@ -31,7 +44,7 @@ if [ ! -f "/opt/lsf/conf/profile.lsf" ]; then
 
     # Clean LSF target directory to support retries cleanly
     echo "Cleaning /opt/lsf target directory..."
-    rm -rf /opt/lsf/* /opt/lsf/.* 2>/dev/null || true
+    rm -rf /opt/lsf/* /opt/lsf/.[!.]* /opt/lsf/..?* 2>/dev/null || true
 
     # Wait for system boot package updates to release the yum/dnf lock
     echo "Waiting for system package manager locks to release..."
@@ -45,29 +58,34 @@ if [ ! -f "/opt/lsf/conf/profile.lsf" ]; then
     yum install -y nfs-utils ed wget git gcc make epel-release libnsl java-1.8.0-openjdk-headless bc
     echo "--- Step 2: Locating LSF Installation Archives ---"
     INSTALL_DIR="/tmp/lsf_dist"
-    mkdir -p $INSTALL_DIR
+    mkdir -p "$INSTALL_DIR"
 
     if [ ! -f "$INSTALL_DIR/lsf10.1_lsfinstall_linux_x86_64.tar.Z" ] || \
        [ ! -f "$INSTALL_DIR/lsf10.1_lnx310-lib217-x86_64.tar.Z" ] || \
        [ ! -f "$INSTALL_DIR/lsf_std_entitlement.dat" ] || \
        [ ! -f "$INSTALL_DIR/lsf10.1_lnx310-lib217-x86_64-602430.tar.Z" ]; then
         echo "Attempting to download LSF installers from GCS bucket..."
-        # Auto-detect the GCS bucket created by Terraform
-        BUCKET_NAME=$(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/attributes/lsf_bucket)
-        if [ -n "$BUCKET_NAME" ]; then
-            echo "Found bucket: gs://$BUCKET_NAME. Downloading files..."
-            gcloud storage cp gs://$BUCKET_NAME/*.tar.Z $INSTALL_DIR/
-            gcloud storage cp gs://$BUCKET_NAME/*.dat $INSTALL_DIR/
+        # Auto-detect the GCS bucket created by Terraform (or fallback to lsf_source_bucket metadata)
+        BUCKET_NAME=$(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/attributes/lsf_bucket || true)
+        SOURCE_BUCKET=$(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/attributes/lsf_source_bucket || true)
+        if [ -n "$BUCKET_NAME" ] && gcloud storage ls "gs://$BUCKET_NAME/*.tar.Z" &>/dev/null; then
+            echo "Found installers in project bucket: gs://$BUCKET_NAME. Downloading files..."
+            gcloud storage cp "gs://$BUCKET_NAME/*.tar.Z" "$INSTALL_DIR/"
+            gcloud storage cp "gs://$BUCKET_NAME/*.dat" "$INSTALL_DIR/"
+        elif [ -n "$SOURCE_BUCKET" ] && gcloud storage ls "gs://$SOURCE_BUCKET/*.tar.Z" &>/dev/null; then
+            echo "Found installers in shared source bucket: gs://$SOURCE_BUCKET. Downloading files..."
+            gcloud storage cp "gs://$SOURCE_BUCKET/*.tar.Z" "$INSTALL_DIR/"
+            gcloud storage cp "gs://$SOURCE_BUCKET/*.dat" "$INSTALL_DIR/"
         else
-            echo "ERROR: Installers not found in $INSTALL_DIR and no GCS bucket found."
-            echo "Please upload lsf10.1_lsfinstall_linux_x86_64.tar.Z, lsf10.1_lnx310-lib217-x86_64.tar.Z, and lsf_std_entitlement.dat to $INSTALL_DIR"
+            echo "ERROR: Installers not found in $INSTALL_DIR and no GCS bucket with LSF archives found."
+            echo "Please run './upload_assets.sh' from your workstation/Cloud Shell or upload lsf10.1_lsfinstall_linux_x86_64.tar.Z, lsf10.1_lnx310-lib217-x86_64.tar.Z, lsf10.1_lnx310-lib217-x86_64-602430.tar.Z, and lsf_std_entitlement.dat to $INSTALL_DIR"
             exit 1
         fi
     fi
 
     # 3. Extract lsfinstall
     echo "--- Step 3: Extracting LSF Installer ---"
-    cd $INSTALL_DIR
+    cd "$INSTALL_DIR"
     tar -zxvf lsf10.1_lsfinstall_linux_x86_64.tar.Z
     cd lsf10.1_lsfinstall
 
@@ -92,13 +110,13 @@ EOT
 
     # 5b. Apply Service Pack 15 Patch (Upgrade to 10.1.0.15)
     echo "--- Step 5b: Applying Service Pack 15 Patch ---"
-    ./patchinstall -f install.config --silent $INSTALL_DIR/lsf10.1_lnx310-lib217-x86_64-602430.tar.Z
+    ./patchinstall -f install.config --silent "$INSTALL_DIR/lsf10.1_lnx310-lib217-x86_64-602430.tar.Z"
 else
     echo "LSF installation detected at /opt/lsf."
-    DAEMONS_DIR=$(ls -d /opt/lsf/10.1/linux*/etc 2>/dev/null || true)
+    DAEMONS_DIR=$(find /opt/lsf/10.1 -maxdepth 2 -type d -name etc 2>/dev/null | head -n 1 || true)
     if [ -n "$DAEMONS_DIR" ] && [ -f "$DAEMONS_DIR/lim" ]; then
         echo "Installed LSF Binary Version Details:"
-        $DAEMONS_DIR/lim -V || true
+        "$DAEMONS_DIR/lim" -V || true
     fi
     echo "Skipping core package installation and patching."
 fi
@@ -107,20 +125,20 @@ fi
 echo "--- Step 6: Applying Hybrid Cloud & Resource Connector Configs ---"
 if [ -f "$CONFIG_SRC/lsf.conf" ]; then
     echo "Copying custom configurations from $CONFIG_SRC to /opt/lsf/conf/..."
-    cp -f $CONFIG_SRC/lsf.conf /opt/lsf/conf/
-    cp -f $CONFIG_SRC/lsf.shared /opt/lsf/conf/
-    cp -f $CONFIG_SRC/lsf.cluster.eda_cluster /opt/lsf/conf/
+    cp -f "$CONFIG_SRC/lsf.conf" /opt/lsf/conf/
+    cp -f "$CONFIG_SRC/lsf.shared" /opt/lsf/conf/
+    cp -f "$CONFIG_SRC/lsf.cluster.eda_cluster" /opt/lsf/conf/
     
     mkdir -p /opt/lsf/conf/lsbatch/eda_cluster/configdir
-    cp -f $CONFIG_SRC/lsb.queues /opt/lsf/conf/lsbatch/eda_cluster/configdir/
-    cp -f $CONFIG_SRC/lsb.hosts /opt/lsf/conf/lsbatch/eda_cluster/configdir/
-    cp -f $CONFIG_SRC/lsb.resources /opt/lsf/conf/lsbatch/eda_cluster/configdir/
-    cp -f $CONFIG_SRC/lsb.modules /opt/lsf/conf/lsbatch/eda_cluster/configdir/
+    cp -f "$CONFIG_SRC/lsb.queues" /opt/lsf/conf/lsbatch/eda_cluster/configdir/
+    cp -f "$CONFIG_SRC/lsb.hosts" /opt/lsf/conf/lsbatch/eda_cluster/configdir/
+    cp -f "$CONFIG_SRC/lsb.resources" /opt/lsf/conf/lsbatch/eda_cluster/configdir/
+    cp -f "$CONFIG_SRC/lsb.modules" /opt/lsf/conf/lsbatch/eda_cluster/configdir/
     
     # Resource connector configs
     mkdir -p /opt/lsf/conf/resource_connector/google/conf
-    cp -f $CONFIG_SRC/hostProviders.json /opt/lsf/conf/resource_connector/
-    cp -f $CONFIG_SRC/googleprov_config.json /opt/lsf/conf/resource_connector/google/conf/
+    cp -f "$CONFIG_SRC/hostProviders.json" /opt/lsf/conf/resource_connector/
+    cp -f "$CONFIG_SRC/googleprov_config.json" /opt/lsf/conf/resource_connector/google/conf/
     
     # Dynamically detect project ID, zone, and region from metadata
     PROJECT_ID=$(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/project/project-id)
@@ -136,7 +154,7 @@ if [ -f "$CONFIG_SRC/lsf.conf" ]; then
     sed -i "s#YOUR_GCP_PROJECT_ID#$PROJECT_ID#g" /opt/lsf/conf/resource_connector/google/conf/googleprov_config.json
     sed -i "s#YOUR_GCP_REGION#$REGION#g" /opt/lsf/conf/resource_connector/google/conf/googleprov_config.json
     
-    cp -f $CONFIG_SRC/googleprov_templates.json /opt/lsf/conf/resource_connector/google/conf/
+    cp -f "$CONFIG_SRC/googleprov_templates.json" /opt/lsf/conf/resource_connector/google/conf/
     
     # Ensure worker image exists in local project for instant bulk VM creation
     if ! gcloud compute images describe lsf-submit-and-worker-rocky-8-image --project="$PROJECT_ID" &>/dev/null; then
@@ -160,17 +178,17 @@ if [ -f "$CONFIG_SRC/lsf.conf" ]; then
     
     # Copy user_data.sh script for cloud workers
     mkdir -p /opt/lsf/10.1/resource_connector/google/scripts
-    cp -f $CONFIG_SRC/user_data.sh /opt/lsf/10.1/resource_connector/google/scripts/
+    cp -f "$CONFIG_SRC/user_data.sh" /opt/lsf/10.1/resource_connector/google/scripts/
     chmod +x /opt/lsf/10.1/resource_connector/google/scripts/user_data.sh
 fi
 
 # 6b. Copy EDA workflows & Scaling scripts from GCS to shared NFS directory (/home/lsfadmin)
 echo "--- Step 6b: Copying workflows and scripts from GCS ---"
-BUCKET_NAME=$(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/attributes/lsf_bucket)
+BUCKET_NAME=$(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/attributes/lsf_bucket || true)
 if [ -n "$BUCKET_NAME" ]; then
     rm -rf /home/lsfadmin/eda_workflow /home/lsfadmin/submit_scripts
-    gcloud storage cp -r gs://$BUCKET_NAME/eda_workflow /home/lsfadmin/
-    gcloud storage cp -r gs://$BUCKET_NAME/submit_scripts /home/lsfadmin/
+    gcloud storage cp -r "gs://$BUCKET_NAME/eda_workflow" /home/lsfadmin/
+    gcloud storage cp -r "gs://$BUCKET_NAME/submit_scripts" /home/lsfadmin/
     chown -R lsfadmin:lsf /home/lsfadmin/eda_workflow /home/lsfadmin/submit_scripts
     chmod +x /home/lsfadmin/eda_workflow/*.sh /home/lsfadmin/submit_scripts/*.sh
     echo "Workflows and scaling scripts successfully copied to /home/lsfadmin/"
@@ -187,21 +205,22 @@ chown -R lsfadmin:lsf /opt/lsf
 
 # Configure eauth binary to run as root with SUID permissions (mandatory for authentication)
 echo "Configuring eauth SUID root permissions..."
-EAUTH_PATH=$(ls /opt/lsf/10.1/linux*/etc/eauth)
-chown root $EAUTH_PATH
-chmod 4755 $EAUTH_PATH
+EAUTH_PATH=$(find /opt/lsf/10.1 -maxdepth 3 -type f -name eauth | head -n 1)
+chown root "$EAUTH_PATH"
+chmod 4755 "$EAUTH_PATH"
 
 # 7. Start LSF daemons directly
 echo "--- Step 7: Starting LSF Cluster Daemons ---"
 set +e
+# shellcheck disable=SC1091
 source /opt/lsf/conf/profile.lsf
 set -e
-DAEMONS_DIR=$(ls -d /opt/lsf/10.1/linux*/etc)
-$DAEMONS_DIR/lim || true
+DAEMONS_DIR=$(find /opt/lsf/10.1 -maxdepth 2 -type d -name etc | head -n 1)
+"$DAEMONS_DIR/lim" || true
 sleep 5
-$DAEMONS_DIR/res || true
+"$DAEMONS_DIR/res" || true
 sleep 5
-$DAEMONS_DIR/sbatchd || true
+"$DAEMONS_DIR/sbatchd" || true
 sleep 5
 lsadmin reconfig -f || true
 badmin reconfig -f || true

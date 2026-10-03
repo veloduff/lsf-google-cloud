@@ -1,9 +1,25 @@
 #!/bin/bash
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 # =====================================================================
 # LSF Hybrid Cloud - GCS Upload Automation Script (upload_assets.sh)
 # =====================================================================
 # This script auto-detects your Terraform-created GCS bucket and
-# uploads the required LSF installer files and custom configurations.
+# uploads the required LSF installer files (from local Install_Files/
+# or a shared GCS source bucket such as in Qwiklabs) along with
+# custom cluster configurations, EDA workflows, and scaling scripts.
 # =====================================================================
 
 set -e
@@ -18,21 +34,51 @@ get_tfvar() {
         tfvars_file="../terraform/terraform.tfvars"
     fi
     if [ -n "$tfvars_file" ]; then
-        grep -E "^\s*${var_name}\s*=" "$tfvars_file" 2>/dev/null | awk -F'=' '{print $2}' | tr -d ' "' | head -n 1 || true
+        grep -E "^\s*${var_name}\s*=" "$tfvars_file" 2>/dev/null | awk -F'=' '{print $2}' | sed 's/#.*//' | tr -d ' "' | head -n 1 || true
     fi
 }
 
 # Disable parallel composite uploads dynamically for this script
 export CLOUDSDK_STORAGE_PARALLEL_COMPOSITE_UPLOAD_ENABLED=False
 
+CLI_BUCKET_NAME=""
+CLI_SOURCE_BUCKET=""
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --bucket=*)
+            CLI_BUCKET_NAME="${1#*=}"
+            shift
+            ;;
+        --bucket)
+            CLI_BUCKET_NAME="$2"
+            shift 2
+            ;;
+        --source-bucket=*)
+            CLI_SOURCE_BUCKET="${1#*=}"
+            shift
+            ;;
+        --source-bucket)
+            CLI_SOURCE_BUCKET="$2"
+            shift 2
+            ;;
+        *)
+            if [ -z "$CLI_BUCKET_NAME" ]; then
+                CLI_BUCKET_NAME="$1"
+            fi
+            shift
+            ;;
+    esac
+done
+
 echo "=================================================="
 echo "LSF Hybrid Cloud: Uploading Assets to GCS"
 echo "=================================================="
 
-# 1. Determine GCS bucket name: custom CLI argument > env var > terraform.tfvars > terraform output
-if [ -n "$1" ]; then
-    BUCKET_NAME="$1"
-elif [ -n "$TF_VAR_bucket_name" ]; then
+# 1. Determine target GCS bucket name: CLI arg > env var > terraform.tfvars > terraform output
+if [ -n "$CLI_BUCKET_NAME" ]; then
+    BUCKET_NAME="$CLI_BUCKET_NAME"
+elif [ -n "${TF_VAR_bucket_name:-}" ]; then
     BUCKET_NAME="$TF_VAR_bucket_name"
 elif [ -n "$(get_tfvar "bucket_name")" ]; then
     BUCKET_NAME="$(get_tfvar "bucket_name")"
@@ -41,28 +87,35 @@ fi
 if [ -z "${BUCKET_NAME:-}" ]; then
     if [ -d "terraform" ]; then
         echo "Retrieving GCS bucket name from Terraform output..."
-        cd terraform
-        BUCKET_NAME=$(terraform output -raw lsf_install_bucket_name 2>/dev/null || true)
-        cd ..
+        BUCKET_NAME=$(terraform -chdir=terraform output -raw lsf_install_bucket_name 2>/dev/null || true)
     fi
 fi
 
 if [ -z "${BUCKET_NAME:-}" ] || [ "$BUCKET_NAME" = "(unset)" ]; then
-    echo "ERROR: Could not retrieve bucket name from CLI argument, environment variables, terraform.tfvars, or Terraform output."
+    echo "ERROR: Could not retrieve target bucket name from CLI argument, environment variables, terraform.tfvars, or Terraform output."
     echo "Did you run 'terraform apply' successfully or specify bucket_name in terraform.tfvars / TF_VAR_bucket_name?"
     exit 1
 fi
 
+BUCKET_NAME="${BUCKET_NAME#gs://}"
+BUCKET_NAME="${BUCKET_NAME%/}"
 echo "Target bucket: gs://${BUCKET_NAME}"
 
-# 2. Check and upload required installer files
-INSTALL_DIR="Install_Files"
+# Determine optional shared GCS source bucket for LSF installers (used in Qwiklabs / enterprise staging)
+SOURCE_BUCKET="${CLI_SOURCE_BUCKET:-${LSF_SOURCE_BUCKET:-${TF_VAR_lsf_source_bucket:-$(get_tfvar "lsf_source_bucket")}}}"
+if [ -z "$SOURCE_BUCKET" ] && [ -d "terraform" ]; then
+    SOURCE_BUCKET=$(terraform -chdir=terraform output -raw lsf_source_bucket 2>/dev/null || true)
+fi
+SOURCE_BUCKET="${SOURCE_BUCKET#gs://}"
+SOURCE_BUCKET="${SOURCE_BUCKET%/}"
 
-FILES_TO_UPLOAD=(
-    "$INSTALL_DIR/lsf10.1_lsfinstall_linux_x86_64.tar.Z:lsf10.1_lsfinstall_linux_x86_64.tar.Z"
-    "$INSTALL_DIR/lsf10.1_lnx310-lib217-x86_64.tar.Z:lsf10.1_lnx310-lib217-x86_64.tar.Z"
-    "$INSTALL_DIR/lsf_std_entitlement.dat:lsf_std_entitlement.dat"
-    "$INSTALL_DIR/lsf10.1_lnx310-lib217-x86_64-602430.tar.Z:lsf10.1_lnx310-lib217-x86_64-602430.tar.Z"
+# 2. Define required LSF 10.1 installer archives
+INSTALL_DIR="Install_Files"
+REQUIRED_ARCHIVES=(
+    "lsf10.1_lsfinstall_linux_x86_64.tar.Z"
+    "lsf10.1_lnx310-lib217-x86_64.tar.Z"
+    "lsf_std_entitlement.dat"
+    "lsf10.1_lnx310-lib217-x86_64-602430.tar.Z"
 )
 
 # 3. Check if LSF is already installed on the Master VM
@@ -80,48 +133,48 @@ if gcloud compute ssh lsf-master --zone="$MASTER_ZONE" --tunnel-through-iap --qu
     echo " -> LSF is already installed on master VM. Skipping installer upload."
     LSF_INSTALLED_ON_VM=true
 else
-    echo " -> LSF is not detected on master VM. Checking local installers..."
+    echo " -> LSF is not detected on master VM. Checking installer sources..."
 fi
 
-UPLOAD_INSTALLERS=true
-if [ "$LSF_INSTALLED_ON_VM" = "true" ]; then
-    UPLOAD_INSTALLERS=false
-else
-    echo "Verifying local installer files..."
-    for entry in "${FILES_TO_UPLOAD[@]}"; do
-        local_file="${entry%%:*}"
-        if [ ! -f "$local_file" ]; then
-            echo "WARNING: Required installer file '$local_file' not found."
-            echo "Skipping LSF installer archives upload (assuming pre-built Golden Images will be used)."
-            UPLOAD_INSTALLERS=false
+if [ "$LSF_INSTALLED_ON_VM" = "false" ]; then
+    # Check if all 4 files exist locally in Install_Files/
+    LOCAL_FOUND=true
+    for archive in "${REQUIRED_ARCHIVES[@]}"; do
+        if [ ! -f "${INSTALL_DIR}/${archive}" ]; then
+            LOCAL_FOUND=false
             break
         fi
     done
+
+    if [ "$LOCAL_FOUND" = "true" ]; then
+        echo "Verified local installer files in '${INSTALL_DIR}/'!"
+        echo "Uploading customer-supplied LSF installers from local directory to gs://${BUCKET_NAME}/..."
+        for archive in "${REQUIRED_ARCHIVES[@]}"; do
+            echo " -> Uploading ${archive}..."
+            gcloud storage cp --no-clobber "${INSTALL_DIR}/${archive}" "gs://${BUCKET_NAME}/${archive}"
+        done
+    elif [ -n "$SOURCE_BUCKET" ] && [ "$SOURCE_BUCKET" != "(unset)" ]; then
+        echo "Staging LSF installer archives from shared GCS source bucket: gs://${SOURCE_BUCKET}/..."
+        for archive in "${REQUIRED_ARCHIVES[@]}"; do
+            echo " -> Copying gs://${SOURCE_BUCKET}/${archive} to gs://${BUCKET_NAME}/${archive}..."
+            gcloud storage cp --no-clobber "gs://${SOURCE_BUCKET}/${archive}" "gs://${BUCKET_NAME}/${archive}"
+        done
+        echo "All 4 LSF installer archives staged from gs://${SOURCE_BUCKET}/!"
+    else
+        echo "WARNING: Local '${INSTALL_DIR}/' not found and no shared LSF_SOURCE_BUCKET configured."
+        echo "Skipping LSF installer archives upload (set LSF_SOURCE_BUCKET / lsf_source_bucket for GCS-to-GCS staging, or use pre-built Golden Images)."
+    fi
 fi
 
-if [ "$UPLOAD_INSTALLERS" = "true" ]; then
-    echo "All local files verified!"
-    # 4. Upload installers (skips already uploaded files using --no-clobber)
-    echo "Uploading LSF installers to GCS..."
-    for entry in "${FILES_TO_UPLOAD[@]}"; do
-        local_file="${entry%%:*}"
-        remote_name="${entry##*:}"
-        echo " -> Uploading ${remote_name}..."
-        gcloud storage cp --no-clobber "$local_file" "gs://${BUCKET_NAME}/${remote_name}"
-    done
-else
-    echo "--- Skipping LSF installers upload block ---"
-fi
-
-# 5. Upload LSF configurations (always syncs configuration folder)
+# 4. Upload LSF configurations (always syncs configuration folder)
 echo "Uploading LSF configuration directory..."
 gcloud storage cp -r "lsf_config" "gs://${BUCKET_NAME}/"
 
-# 6. Upload EDA sample workflow directory
+# 5. Upload EDA sample workflow directory
 echo "Uploading EDA sample workflow directory..."
 gcloud storage cp -r "eda_workflow" "gs://${BUCKET_NAME}/"
 
-# 7. Upload Submit & Scaling test scripts directory
+# 6. Upload Submit & Scaling test scripts directory
 echo "Uploading Submit & Scaling test scripts directory..."
 gcloud storage cp -r "submit_scripts" "gs://${BUCKET_NAME}/"
 

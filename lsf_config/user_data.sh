@@ -1,4 +1,18 @@
 #!/bin/sh
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 # =====================================================================
 # LSF Resource Connector - GCP Worker Startup Script (user_data.sh)
 # =====================================================================
@@ -24,8 +38,11 @@ echo "$local_ip $(hostname)" >> /etc/hosts
 
 # 4. Export PATH to expose pre-installed Conda and EDA tools
 export PATH="/opt/conda/envs/eda/bin:/opt/conda/bin:$PATH"
+if [ -d "/opt/conda" ] && [ ! -f "/etc/profile.d/conda.sh" ]; then
+    echo "export PATH=\"/opt/conda/envs/eda/bin:/opt/conda/bin:\$PATH\"" > /etc/profile.d/conda.sh
+fi
 
-# 6. Mount shared LSF and Home directories from Master with retry loop
+# 5. Mount shared LSF and Home directories from Master with retry loop
 echo "Mounting NFS directories from LSF Master..." >> $logfile
 mkdir -p /opt/lsf
 systemctl start rpcbind || true
@@ -40,23 +57,23 @@ until mount -t nfs -o rw,hard,noatime,rsize=1048576,wsize=1048576,timeo=600,retr
     sleep 3
 done
 
-# 6.1 Synchronize local user accounts from shared /home
+# 6. Synchronize local user accounts from shared /home
 echo "Syncing user accounts from shared /home..." >> $logfile
 for udir in /home/*; do
     if [ -d "$udir" ]; then
         uname=$(basename "$udir")
         uid=$(stat -c "%u" "$udir")
         gid=$(stat -c "%g" "$udir")
-        groupadd -g $gid $uname 2>/dev/null || true
-        useradd -u $uid -g $gid -d $udir -s /bin/bash $uname 2>/dev/null || true
+        groupadd -g "$gid" "$uname" 2>/dev/null || true
+        useradd -u "$uid" -g "$gid" -d "$udir" -s /bin/bash "$uname" 2>/dev/null || true
         echo "Synced user: $uname (UID: $uid, GID: $gid)" >> $logfile
     fi
 done
 
-# 8. Source LSF profile first to populate paths
+# 7. Source LSF profile first to populate paths
 . /opt/lsf/conf/profile.lsf
 
-# 7. Set up local LSF configuration override
+# 8. Set up local LSF configuration override
 echo "Configuring local LSF environment..." >> $logfile
 mkdir -p /etc/lsf
 export LSF_ENVDIR=/etc/lsf

@@ -1,3 +1,17 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 variable "project_id" {
   description = "The GCP Project ID where resources will be deployed."
   type        = string
@@ -69,9 +83,14 @@ variable "bucket_location" {
   default     = "US"
 }
 
+variable "lsf_source_bucket" {
+  description = "Optional shared GCS bucket name containing the 4 IBM Spectrum LSF 10.1 installer archives (e.g., for Qwiklabs or centralized enterprise staging)."
+  type        = string
+  default     = null
+}
+
 variable "ssh_source_ranges" {
   description = "Source IP CIDR ranges allowed for SSH access (port 22). Defaults to Google Cloud IAP TCP forwarding range (35.235.240.0/20). Change to [\"0.0.0.0/0\"] for open initial testing."
   type        = list(string)
   default     = ["35.235.240.0/20"]
 }
-

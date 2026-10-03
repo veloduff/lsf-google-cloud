@@ -1,0 +1,157 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+entity_type: Lab
+schema_version: 2
+default_locale: en
+
+title: "Bursting Semiconductor EDA Workloads to Google Cloud with IBM Spectrum LSF"
+description: >-
+  In this hands-on workshop, you deploy a hybrid Electronic Design Automation
+  (EDA) cluster using Terraform, bake a custom Compute Engine Golden Image with
+  an open-source RTL-to-GDSII toolchain (Icarus Verilog, Yosys, Verilator,
+  OpenROAD, Magic, Netgen), install IBM Spectrum LSF 10.1 with the Google Cloud
+  Resource Connector, dynamically burst 10 cloud worker VMs (20 slots), and
+  execute a 100-task multi-seed hardware verification regression sweep.
+
+duration: 90
+max_duration: 120
+credits: 5
+level: advanced
+
+tags:
+  - HPC
+  - EDA
+  - Semiconductor
+  - IBM Spectrum LSF
+  - Compute Engine
+  - Terraform
+  - Hybrid Cloud
+
+product_tags:
+  - GCE
+  - GCS
+  - VPC
+  - Cloud DNS
+  - Cloud NAT
+
+environment:
+  resources:
+    - type: gcp_project
+      id: project_0
+      variant: gcpd
+      ssh_key_user: user_0
+      allowed_locations:
+        - us-central1-a
+      startup_script:
+        type: qwiklabs
+        path: tf
+        custom_properties:
+          - key: gcp_project_id
+            reference: project_0.project_id
+          - key: gcp_region
+            reference: project_0.default_region
+          - key: gcp_zone
+            reference: project_0.default_zone
+          - key: gcp_username
+            reference: user_0.username
+    - type: gcp_user
+      id: user_0
+      variant: default
+      permissions:
+        - project: project_0
+          roles:
+            - roles/owner
+            - roles/iam.serviceAccountAdmin
+            - roles/compute.admin
+            - roles/storage.admin
+            - roles/dns.admin
+            - roles/iap.tunnelResourceAccessor
+
+  student_visible_outputs:
+    - label: "Open GCP Console"
+      reference: project_0.console_url
+    - label: "GCP Project ID"
+      reference: project_0.project_id
+    - label: "GCP Username"
+      reference: user_0.username
+    - label: "GCP Password"
+      reference: user_0.password
+    - label: "GCP Region"
+      reference: project_0.default_region
+    - label: "GCP Zone"
+      reference: project_0.default_zone
+    - label: "Shared LSF Installer Source Bucket"
+      reference: project_0.startup_script.lsf_source_bucket
+
+assessment:
+  passing_percentage: 80
+  steps:
+    - title: "Deploy Hybrid Cloud VPCs, Peering, Cloud DNS, GCS Bucket, and On-Premises VMs with Terraform"
+      locale_id: task_1_hybrid_infra
+      maximum_score: 20
+      student_messages:
+        success: "Great job! You deployed the hybrid VPCs, peering, Private Cloud DNS zones, GCS installer bucket, and on-premises VMs."
+        vpc_missing: "Please deploy the onprem-vpc and gcp-burst-vpc networks using Terraform."
+        bucket_missing: "Please create the lsf-install-bucket-<PROJECT_ID> Cloud Storage bucket using Terraform."
+        dns_missing: "Please create the lsf-internal-zone Cloud DNS private zone using Terraform."
+        vms_missing: "Please ensure both lsf-master and lsf-submit VMs are deployed and RUNNING."
+      services:
+        - project_0.ComputeV1
+        - project_0.StorageV1
+        - project_0.DnsV1
+      method_name: check_task1_infra
+
+    - title: "Build the Pre-Baked EDA Worker Golden Image (lsf-submit-and-worker-rocky-8-image)"
+      locale_id: task_2_golden_image
+      maximum_score: 20
+      student_messages:
+        success: "Great job! The pre-baked EDA worker Golden Image (lsf-submit-and-worker-rocky-8-image) is READY."
+        image_missing: "Please build the custom Golden Image (lsf-submit-and-worker-rocky-8-image) using ./lsf_config/build_golden_image.sh."
+      services:
+        - project_0.ComputeV1
+      method_name: check_task2_golden_image
+
+    - title: "Stage LSF Installers from Shared Cloud Storage and Bootstrap the LSF Master Node"
+      locale_id: task_3_lsf_master
+      maximum_score: 20
+      student_messages:
+        success: "Great job! The LSF 10.1 + SP15 installers are staged and lsf-master is bootstrapped and running."
+        archives_missing: "Please stage the 4 LSF installer archives into your project bucket using ./upload_assets.sh."
+        master_not_ready: "Please bootstrap the LSF master node using ./lsf_config/setup_master.sh."
+      services:
+        - project_0.StorageV1
+        - project_0.ComputeV1
+      method_name: check_task3_lsf_master
+
+    - title: "Trigger Dynamic Cloud Bursting and Auto-Scaling (10 Workers / 20 Slots) with LSF Resource Connector"
+      locale_id: task_4_autoscaling
+      maximum_score: 20
+      student_messages:
+        success: "Great job! LSF Resource Connector dynamically provisioned burst compute-* worker VMs in gcp-burst-vpc."
+        burst_missing: "Please submit the 20-task scale test (./submit_scale_10.sh) from lsf-submit to trigger dynamic cloud bursting."
+      services:
+        - project_0.ComputeV1
+        - project_0.DnsV1
+      method_name: check_task4_autoscaling
+
+    - title: "Run Verilog Simulation, Yosys Logic Synthesis, and a 100-Task Multi-Seed Regression Array"
+      locale_id: task_5_eda_regression
+      maximum_score: 20
+      student_messages:
+        success: "Congratulations! You completed the Verilog simulation, Yosys synthesis, and 100-task multi-seed EDA regression sweep."
+        regression_missing: "Please run the Verilog simulation, Yosys synthesis, and 100-task regression array on lsf-submit."
+      services:
+        - project_0.ComputeV1
+      method_name: check_task5_eda_regression

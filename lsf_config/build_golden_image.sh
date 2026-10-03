@@ -1,4 +1,18 @@
 #!/bin/bash
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 # =====================================================================
 # LSF Hybrid Cloud: Automated Golden Image Builder (build_golden_image.sh)
 # =====================================================================
@@ -14,7 +28,7 @@ get_tfvar() {
         tfvars_file="../terraform/terraform.tfvars"
     fi
     if [ -n "$tfvars_file" ]; then
-        grep -E "^\s*${var_name}\s*=" "$tfvars_file" 2>/dev/null | awk -F'=' '{print $2}' | tr -d ' "' | head -n 1 || true
+        grep -E "^\s*${var_name}\s*=" "$tfvars_file" 2>/dev/null | awk -F'=' '{print $2}' | sed 's/#.*//' | tr -d ' "' | head -n 1 || true
     fi
 }
 
@@ -23,6 +37,7 @@ CLI_PROJECT_ID=""
 CLI_REGION=""
 CLI_ZONE=""
 CLI_SUBNET=""
+CLI_MACHINE_TYPE=""
 POSITIONAL_ARGS=()
 
 while [[ $# -gt 0 ]]; do
@@ -57,6 +72,14 @@ while [[ $# -gt 0 ]]; do
       ;;
     --subnet)
       CLI_SUBNET="$2"
+      shift 2
+      ;;
+    --machine-type=*)
+      CLI_MACHINE_TYPE="${1#*=}"
+      shift
+      ;;
+    --machine-type)
+      CLI_MACHINE_TYPE="$2"
       shift 2
       ;;
     *)
@@ -97,6 +120,7 @@ if [ -z "$ZONE" ] || [ "$ZONE" = "(unset)" ]; then
 fi
 
 SUBNET="${CLI_SUBNET:-lsf-cloud-subnet}"
+MACHINE_TYPE="${CLI_MACHINE_TYPE:-n2-standard-4}"
 BUILD_VM="lsf-golden-build"
 IMAGE_NAME="lsf-submit-and-worker-rocky-8-image"
 
@@ -108,11 +132,12 @@ fi
 echo "=================================================="
 echo "Starting Golden Image Build Pipeline for LSF Workers"
 echo "=================================================="
-echo " Project ID : ${PROJECT_ID}"
-echo " Region     : ${REGION}"
-echo " Zone       : ${ZONE}"
-echo " Subnet     : ${SUBNET}"
-echo " Image Name : ${IMAGE_NAME}"
+echo " Project ID   : ${PROJECT_ID}"
+echo " Region       : ${REGION}"
+echo " Zone         : ${ZONE}"
+echo " Subnet       : ${SUBNET}"
+echo " Machine Type : ${MACHINE_TYPE}"
+echo " Image Name   : ${IMAGE_NAME}"
 echo "=================================================="
 
 # 1. Spin up temporary builder VM
@@ -120,7 +145,7 @@ echo "Step 1: Creating temporary GCE VM '$BUILD_VM'..."
 gcloud compute instances create "$BUILD_VM" \
     --project="$PROJECT_ID" \
     --zone="$ZONE" \
-    --machine-type="c2-standard-4" \
+    --machine-type="$MACHINE_TYPE" \
     --subnet="$SUBNET" \
     --service-account="lsf-resource-connector-sa@${PROJECT_ID}.iam.gserviceaccount.com" \
     --scopes="https://www.googleapis.com/auth/cloud-platform" \
